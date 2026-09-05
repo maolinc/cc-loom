@@ -40,7 +40,7 @@
     "@maolinc/cc-loom-shared": "workspace:*",
     "chokidar": "^3.6.0",
     "commander": "^12.1.0",
-    "ink": "^5.0.0",
+    "ink": "^7.1.1",
     "picocolors": "^1.1.1",
     "react": "^18.3.0",
     "ws": "^8.21.1"

@@ -43,12 +43,12 @@
     "ink": "^5.0.0",
     "picocolors": "^1.1.1",
     "react": "^18.3.0",
-    "ws": "^8.21.1"
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@types/react": "^18.3.0",
     "@types/ws": "^8.5.12",
-    "tsx": "^4.19.0",
+    "tsx": "^4.23.13",
     "typescript": "^5.5.0",
     "vitest": "^1.6.1"
   }

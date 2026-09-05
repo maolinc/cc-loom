@@ -1,6 +1,6 @@
 {
   "name": "@maolinc/cc-loom-adapter",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Loom adapter engine — pure-format conversion between AI tool vendors",
   "license": "MIT",
   "repository": {

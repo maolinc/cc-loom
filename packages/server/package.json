@@ -1,6 +1,6 @@
 {
   "name": "@maolinc/cc-loom-server",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Loom server — Fastify backend with SQLite, WebSocket, and static SPA serving",
   "license": "MIT",
   "repository": {

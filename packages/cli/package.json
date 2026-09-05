@@ -1,6 +1,6 @@
 {
   "name": "@maolinc/cc-loom",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Loom CLI — connects your local project to Loom server via WebSocket",
   "license": "MIT",
   "repository": {

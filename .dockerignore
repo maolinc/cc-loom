@@ -1,0 +1,29 @@
+# 只保留源码和配置，排除编译产物和依赖（容器内重新安装+编译）
+**/dist/
+**/node_modules/
+**/.git/
+**/*.log
+**/tsconfig.tsbuildinfo
+.env
+.env.*
+!.env.example
+/.mcp.json
+/.claude/
+/.codex/
+/.scratch/
+/.pnpm-store/
+/coverage/
+/playwright-report/
+/test-results/
+/image.png
+/dist-pack/
+/*.tgz
+
+# 测试产物
+tests/debug-*.ts
+
+# 文档与设计稿（不影响测试）
+docs/
+*.md
+!pnpm-lock.yaml
+loom-web.pen

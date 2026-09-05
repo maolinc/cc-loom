@@ -1,0 +1,5 @@
+{
+  "name": "flyai",
+  "version": "1.0.14",
+  "description": "A root plugin referenced through its own repository URL"
+}

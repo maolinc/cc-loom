@@ -1,0 +1,9 @@
+{
+  "description": "valid hook",
+  "event": "PostToolUse",
+  "matcher": "Edit",
+  "hooks": [
+    { "type": "command", "command": "ok.sh" },
+    { "type": "http", "url": "https://example.com/hook", "headers": { "X": "y" } }
+  ]
+}

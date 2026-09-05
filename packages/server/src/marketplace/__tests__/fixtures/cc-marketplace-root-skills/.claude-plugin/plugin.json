@@ -1,0 +1,6 @@
+{
+  "name": "rootplugin",
+  "version": "1.0.0",
+  "description": "Self-pointing marketplace plugin; declared skills replace default scan",
+  "skills": ["./skills/declared"]
+}

@@ -1,0 +1,55 @@
+{
+  "name": "@maolinc/cc-loom",
+  "version": "0.1.2",
+  "description": "Loom CLI — connects your local project to Loom server via WebSocket",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/maolinc/cc-loom.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/maolinc/cc-loom#readme",
+  "bugs": {
+    "url": "https://github.com/maolinc/cc-loom/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "loom": "./dist/index.js"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
+    "prepack": "pnpm run build",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@maolinc/cc-loom-adapter": "workspace:*",
+    "@maolinc/cc-loom-shared": "workspace:*",
+    "chokidar": "^3.6.0",
+    "commander": "^12.1.0",
+    "ink": "^5.0.0",
+    "picocolors": "^1.1.1",
+    "react": "^18.3.0",
+    "ws": "^8.21.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "@types/ws": "^8.5.12",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0",
+    "vitest": "^1.6.1"
+  }
+}

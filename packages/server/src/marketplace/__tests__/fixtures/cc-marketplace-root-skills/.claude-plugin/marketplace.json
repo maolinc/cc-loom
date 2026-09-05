@@ -1,0 +1,8 @@
+{
+  "name": "rootmarket",
+  "description": "Marketplace that is its own plugin with declared skills",
+  "owner": { "name": "Root Org" },
+  "plugins": [
+    { "name": "rootplugin", "version": "1.0.0", "source": "./" }
+  ]
+}

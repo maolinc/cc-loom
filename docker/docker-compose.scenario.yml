@@ -1,0 +1,34 @@
+# L4 多容器编排模板 (--mode multi 时使用)
+# server 单独一个容器; 每个 agent 独立容器, 通过 service 名互连
+#
+# 用法 (由 runner.js 自动编排):
+#   docker compose -f docker/docker-compose.scenario.yml up -d
+#   docker compose -f docker/docker-compose.scenario.yml down
+
+services:
+  server:
+    image: loom-test-runtime:latest
+    entrypoint: ["node", "/opt/loom/dist/server/index.js"]
+    environment:
+      - PORT=47474
+      - HOST=0.0.0.0
+      - HOME=/tmp/loom-home
+      - LOOM_DATA_DIR=/tmp/loom-home/.loom
+    ports:
+      - "47474"
+    tmpfs:
+      - /tmp
+
+  # agent 容器由 runner 按需 scale: docker compose up --scale agent=N
+  agent:
+    image: loom-test-runtime:latest
+    entrypoint: ["sleep", "infinity"]
+    depends_on:
+      - server
+    environment:
+      - HOME=/tmp/loom-home
+      - LOOM_HOME=/tmp/loom-home/.loom
+      - LOOM_ENDPOINT=http://server:47474
+    tmpfs:
+      - /tmp
+    command: ["sleep", "infinity"]

@@ -1,0 +1,4 @@
+{
+  "event": "Foobar",
+  "hooks": [{ "type": "command", "command": "x.sh" }]
+}

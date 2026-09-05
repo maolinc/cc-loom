@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* 数字默认等宽，数据型 UI 对齐更稳 */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 选中色跟随品牌 */
+::selection {
+  background: rgba(75, 90, 211, 0.16);
+}
+
+/* ── 表面层级 ──────────────────────────────────────────────
+   card-bento：可交互卡片（hover 微浮起，阴影带蓝灰色调）。
+   panel：非交互容器表面（白底 + 极细边 + 轻阴影），不抢内容。 */
+.card-bento {
+  background: #ffffff;
+  border-radius: 18px;
+  border: 1px solid #eaeef5;
+  box-shadow: 0 1px 2px rgba(24, 32, 68, 0.04);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.card-bento:hover {
+  transform: translateY(-2px);
+  border-color: #d9e0f0;
+  box-shadow: 0 12px 28px -8px rgba(24, 32, 68, 0.13), 0 3px 8px rgba(24, 32, 68, 0.05);
+}
+.card-bento:active {
+  transform: translateY(0);
+}
+
+.panel {
+  background: #ffffff;
+  border-radius: 18px;
+  border: 1px solid #eaeef5;
+  box-shadow: 0 1px 2px rgba(24, 32, 68, 0.04);
+}
+
+/* Slide-out panel animation */
+@keyframes slideIn {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+.animate-slide-in {
+  animation: slideIn 0.24s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* 自定义滚动条，贴合浅色控制台风格 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cdd4e0 transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: #cdd4e0;
+  border-radius: 9999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #a8b2c4;
+}
+
+/* 可访问性：键盘焦点统一可见描边；组件自带的 ring 类会覆盖它 */
+:focus-visible {
+  outline: 2px solid rgba(75, 90, 211, 0.55);
+  outline-offset: 2px;
+}

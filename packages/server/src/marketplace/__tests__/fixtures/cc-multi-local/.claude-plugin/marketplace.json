@@ -1,0 +1,9 @@
+{
+  "name": "multimarket",
+  "description": "Marketplace with several local sibling plugins",
+  "owner": { "name": "Multi Org" },
+  "plugins": [
+    { "name": "alpha", "version": "1.0.0", "source": "./plugins/alpha" },
+    { "name": "beta", "version": "2.0.0", "source": "./plugins/beta" }
+  ]
+}

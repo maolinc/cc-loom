@@ -1,0 +1,31 @@
+{
+  "name": "official-plugin",
+  "version": "2.0.0",
+  "description": "Exercises every official component path field",
+  "skills": [
+    "./custom-skills/alpha",
+    "./custom-skills/beta.md"
+  ],
+  "commands": {
+    "deploy": { "source": "./commands/deploy.md", "description": "Deploy" }
+  },
+  "agents": [
+    "./agents/reviewer.md"
+  ],
+  "hooks": {
+    "PostToolUse": [
+      { "matcher": "Write|Edit", "hooks": [{ "type": "command", "command": "echo hi" }] }
+    ],
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "echo start" }] },
+      { "matcher": ".*", "hooks": [{ "type": "command", "command": "echo start2" }] }
+    ]
+  },
+  "mcpServers": {
+    "inline-server": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@example/server"]
+    }
+  }
+}

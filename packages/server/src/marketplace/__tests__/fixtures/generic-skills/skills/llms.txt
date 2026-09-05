@@ -1,0 +1,2 @@
+This is not a skill. It is a loose llms.txt file that some repos place under skills/.
+It must NOT be imported as a skill because it does not conform to the skill spec.

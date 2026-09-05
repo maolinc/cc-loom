@@ -1,0 +1,5 @@
+{
+  "name": "root-skill-plugin",
+  "version": "1.0.0",
+  "description": "Single-skill plugin with a root SKILL.md, no skills/ dir"
+}

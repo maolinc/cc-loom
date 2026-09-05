@@ -1,0 +1,9 @@
+{
+  "name": "nested-skills-plugin",
+  "version": "1.0.0",
+  "description": "Skills nested by category, declared individually in the manifest",
+  "skills": [
+    "./skills/engineering/ask-matt",
+    "./skills/productivity/grill-me"
+  ]
+}

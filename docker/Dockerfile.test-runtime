@@ -1,0 +1,41 @@
+# Loom 测试 runtime 镜像
+# 分层优化: 依赖安装(慢,缓存) → 源码编译(快) 分离
+# 改 tests/ 或 testkit 源码只触发 build 层,不重跑 pnpm install
+
+FROM loom-test-base:latest
+WORKDIR /opt/loom
+
+# ---- 1. 依赖安装层 (仅 package.json/lockfile 变化时重跑) ----
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.json ./
+COPY packages/shared/package.json  packages/shared/
+COPY packages/adapter/package.json packages/adapter/
+COPY packages/server/package.json  packages/server/
+COPY packages/cli/package.json     packages/cli/
+COPY packages/web/package.json     packages/web/
+COPY packages/testkit/package.json packages/testkit/
+RUN corepack enable && pnpm install --frozen-lockfile
+
+# ---- 1.5 Playwright 浏览器 (L5 UI 测试, 系统依赖已在 base 镜像安装) ----
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+RUN pnpm --filter @maolinc/cc-loom-testkit exec playwright install --with-deps chromium
+
+# ---- 2. 源码 + 编译层 (源码变化时重跑,但 install 已缓存) ----
+COPY packages/ ./packages/
+COPY tests/ ./tests/
+RUN pnpm -r build
+
+# ---- 3. 运行时环境 ----
+ENV HOME=/tmp/loom-home
+ENV LOOM_DATA_DIR=/tmp/loom-home/.loom
+ENV LOOM_HOME=/tmp/loom-home/.loom
+ENV LOOM_SERVER_BIN=/opt/loom/packages/server/dist/index.js
+ENV LOOM_CLI_BIN=/opt/loom/packages/cli/dist/index.js
+ENV LOOM_FIXTURES_DIR=/opt/loom/tests/fixtures
+# 测试专用：允许 marketplace 用 file:// 本地 fixture 仓库代替联网 git clone
+ENV LOOM_TEST_ALLOW_FILE_CLONE=1
+# 测试专用：语义搜索 worker 快速轮询（生产 5s 太慢），加速 L3 索引用例
+ENV LOOM_SEARCH_WORKER_TICK_MS=300
+
+# runner 入口: node packages/testkit/dist/runner.js --layer l3 [--mode single] [--grep pattern]
+# 本地开发可挂载 tests/ 覆盖: docker run -v $(pwd)/tests:/opt/loom/tests ...
+ENTRYPOINT ["node", "/opt/loom/packages/testkit/dist/runner.js"]

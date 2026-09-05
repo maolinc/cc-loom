@@ -1,0 +1,28 @@
+node_modules
+dist
+*.db
+*.db-journal
+.env
+.env.local
+.env.*
+!.env.example
+.turbo
+*.tsbuildinfo
+coverage
+playwright-report
+test-results
+
+# 本机 Agent / IDE 配置可能包含 token、私有项目规则或绝对路径。
+/.mcp.json
+/.claude/
+/.codex/
+/.scratch/
+/.pnpm-store/
+/image.png
+/dist-pack/
+/*.tgz
+.eslintcache
+
+# Operating-system metadata.
+.DS_Store
+Thumbs.db

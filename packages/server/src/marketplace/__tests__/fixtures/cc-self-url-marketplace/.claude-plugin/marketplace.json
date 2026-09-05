@@ -1,0 +1,16 @@
+{
+  "name": "flyai-marketplace",
+  "owner": { "name": "alibaba-flyai" },
+  "plugins": [
+    {
+      "name": "flyai",
+      "description": "A root plugin referenced through its own repository URL",
+      "version": "1.0.14",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/alibaba-flyai/flyai-skill.git"
+      },
+      "author": { "name": "alibaba-flyai" }
+    }
+  ]
+}

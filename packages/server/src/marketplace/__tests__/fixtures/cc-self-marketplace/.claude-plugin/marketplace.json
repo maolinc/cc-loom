@@ -1,0 +1,14 @@
+{
+  "name": "selfmarket",
+  "description": "A repo that is both a marketplace and its own plugin",
+  "owner": { "name": "Self Org", "email": "self@example.com" },
+  "plugins": [
+    {
+      "name": "selfplugin",
+      "description": "The only plugin, which lives at the marketplace root",
+      "version": "9.9.9",
+      "source": "./",
+      "author": { "name": "Self Author" }
+    }
+  ]
+}

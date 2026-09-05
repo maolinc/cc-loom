@@ -1,0 +1,12 @@
+{
+  "description": "Auto-format code on Write/Edit",
+  "event": "PostToolUse",
+  "matcher": "Write|Edit",
+  "hooks": [
+    {
+      "type": "command",
+      "command": "format.sh",
+      "timeout": 30
+    }
+  ]
+}

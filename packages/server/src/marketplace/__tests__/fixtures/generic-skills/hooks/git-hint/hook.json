@@ -1,0 +1,10 @@
+{
+  "description": "Inject git context on user prompt",
+  "event": "UserPromptSubmit",
+  "hooks": [
+    {
+      "type": "command",
+      "command": "hint.sh"
+    }
+  ]
+}

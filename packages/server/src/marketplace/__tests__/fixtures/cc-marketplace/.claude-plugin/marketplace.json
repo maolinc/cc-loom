@@ -1,0 +1,19 @@
+{
+  "name": "test-marketplace",
+  "owner": { "name": "Test Org", "email": "test@example.com" },
+  "metadata": { "description": "A test marketplace", "version": "1.0.0" },
+  "plugins": [
+    {
+      "name": "alpha-plugin",
+      "source": { "source": "url", "url": "https://github.com/example/alpha.git" },
+      "description": "First plugin",
+      "version": "0.1.0"
+    },
+    {
+      "name": "beta-plugin",
+      "source": { "source": "url", "url": "https://github.com/example/beta.git", "ref": "dev" },
+      "description": "Second plugin",
+      "version": "0.2.0"
+    }
+  ]
+}

@@ -56,7 +56,7 @@
   "devDependencies": {
     "@maolinc/cc-loom-web": "workspace:*",
     "@types/better-sqlite3": "^7.6.11",
-    "@types/node": "^20.19.0",
+    "@types/node": "^26.4.1",
     "@types/ws": "^8.5.12",
     "@vitest/ui": "^1.6.0",
     "tsx": "^4.19.0",

@@ -271,7 +271,7 @@ export const assetUpdateSchema = assetCreateBase
     refineAuthBindingsByType(data.type, data.auth, ctx);
   });
 
-export const workspaceCreateSchema = z.object({
+export const capabilitySetCreateSchema = z.object({
   name: z.string().min(1, "名称不能为空").max(100),
   description: z.string().min(1, "描述不能为空").max(500),
   targetTools: z.array(z.enum(TARGET_TOOLS)).min(1, "至少选择一个目标工具"),
@@ -279,7 +279,7 @@ export const workspaceCreateSchema = z.object({
   assetIds: z.array(z.string().min(1)).optional(),
 });
 
-export const workspaceUpdateSchema = workspaceCreateSchema.partial().extend({
+export const capabilitySetUpdateSchema = capabilitySetCreateSchema.partial().extend({
   version: z.string().optional(),
 });
 
@@ -292,7 +292,7 @@ export const projectRegisterSchema = z.object({
 
 export const installRequestSchema = z.object({
   projectId: z.string().min(1),
-  workspaceId: z.string().min(1),
+  capabilitySetId: z.string().min(1),
   targetTools: z.array(z.enum(TARGET_TOOLS)).min(1, "至少选择一个目标工具"),
   policy: z.enum(SYNC_POLICIES),
   /**
@@ -313,7 +313,7 @@ export const assetSearchSchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 
-export const workspaceSearchSchema = z.object({
+export const capabilitySetSearchSchema = z.object({
   query: z.string().optional(),
   visibility: z.enum(VISIBILITY_OPTIONS).optional(),
   page: z.coerce.number().int().min(1).default(1),
@@ -523,11 +523,11 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type ValidatedAssetCreate = z.infer<typeof assetCreateSchema>;
 export type ValidatedAssetUpdate = z.infer<typeof assetUpdateSchema>;
-export type ValidatedWorkspaceCreate = z.infer<typeof workspaceCreateSchema>;
-export type ValidatedWorkspaceUpdate = z.infer<typeof workspaceUpdateSchema>;
+export type ValidatedCapabilitySetCreate = z.infer<typeof capabilitySetCreateSchema>;
+export type ValidatedCapabilitySetUpdate = z.infer<typeof capabilitySetUpdateSchema>;
 export type ValidatedInstallRequest = z.infer<typeof installRequestSchema>;
 export type ValidatedAssetSearch = z.infer<typeof assetSearchSchema>;
-export type ValidatedWorkspaceSearch = z.infer<typeof workspaceSearchSchema>;
+export type ValidatedCapabilitySetSearch = z.infer<typeof capabilitySetSearchSchema>;
 export type ValidatedCredentialCreate = z.infer<typeof credentialCreateSchema>;
 export type ValidatedCredentialUpdate = z.infer<typeof credentialUpdateSchema>;
 export type ValidatedCredentialDistribute = z.infer<typeof credentialDistributeSchema>;

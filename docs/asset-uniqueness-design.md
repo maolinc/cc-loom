@@ -1,21 +1,21 @@
 # Loom Asset 唯一性设计方案（按厂商适配）
 
 > 状态：设计定稿（待落地）
-> 适用范围：平台注册库 + 工作空间/本地同步 + 各厂商 Adapter 投影
+> 适用范围：平台注册库 + 能力集/本地同步 + 各厂商 Adapter 投影
 
 ---
 
 ## 0. TL;DR
 
-唯一性不是一个全局概念，而是**按作用域分层**，且在工作空间层**按厂商各算一遍**：
+唯一性不是一个全局概念，而是**按作用域分层**，且在能力集层**按厂商各算一遍**：
 
 - **平台 / 注册库**：身份锚点是 UUID，`name` 可随意重复，随意上传同名。
-- **工作空间 / 本地同步**：身份锚点是“落盘身份载体”，作用域是 `(workspace, tool)`，同身份互斥（hook 除外）。
+- **能力集 / 本地同步**：身份锚点是“落盘身份载体”，作用域是 `(能力集, tool)`，同身份互斥（hook 除外）。
 - 厂商不支持的类型不参与该厂商唯一性；skill/rule/command/agent 按 `(tool, type, name)`、mcp 按 `(tool, 最终 serverKey)`、hook 按 `(tool, event, matcher)` 追加豁免。
 
 ---
 
-## 1. 核心认知：唯一性作用域是 `(workspace, tool)`
+## 1. 核心认知：唯一性作用域是 `(能力集, tool)`
 
 `BaseAdapter.generate`（`packages/adapter/src/base.ts:50-67`）落盘前做两层过滤：
 
@@ -25,7 +25,7 @@
 由此得出两条原则：
 
 - 每个厂商落到各自 `targetDir`（`.cursor` / `.codebuddy` / `.claude` / `.codex`），**厂商之间天然不互撞**。
-- 唯一性必须**分厂商各算一遍**：同一 workspace 内两个同名 skill，若都兼容 cursor 则在 cursor 下冲突；若一个只兼容 cursor、另一个只兼容 codex 则不冲突。
+- 唯一性必须**分厂商各算一遍**：同一 能力集 内两个同名 skill，若都兼容 cursor 则在 cursor 下冲突；若一个只兼容 cursor、另一个只兼容 codex 则不冲突。
 
 > 结论：InstallKey 的第一维永远是 `tool`。
 
@@ -36,10 +36,10 @@
 | 作用域 | 身份锚点 | name 是否可重复 | 角色 |
 |--------|---------|----------------|------|
 | **平台 / 注册库** | UUID | ✅ 可随意同名 | 仓库，存候选 |
-| **工作空间 / 本地同步** | 落盘身份载体（见 §4） | ❌ 同身份互斥 | 投影到真实目录 |
+| **能力集 / 本地同步** | 落盘身份载体（见 §4） | ❌ 同身份互斥 | 投影到真实目录 |
 
 - 平台层：引用靠 UUID，重名无害 → 随意上传同名。
-- 工作空间层：能力投影成真实文件/配置，同身份 = 同物理位置 = 必然覆盖 → 必须唯一。
+- 能力集层：能力投影成真实文件/配置，同身份 = 同物理位置 = 必然覆盖 → 必须唯一。
 
 ---
 
@@ -122,9 +122,9 @@ computeInstallKey(asset, tool):
 
 | 时机 | 动作 |
 |------|------|
-| **加入 Workspace** | 对该 asset 的**每个 compatibleTool** 各算 InstallKey，任一 tool 下撞键 → 拦截、二选一（替换 / 取消）；hook 追加豁免 |
+| **加入 CapabilitySet** | 对该 asset 的**每个 compatibleTool** 各算 InstallKey，任一 tool 下撞键 → 拦截、二选一（替换 / 取消）；hook 追加豁免 |
 | **安装预览 diff** | 兜底展示与本地已有文件冲突，确认覆盖（产品文档 9.8.3）；MCP 按 serverKey、hook 按 event/matcher 展示 |
-| **本地同步** | Workspace 已唯一，投影自动继承；非 Loom 的外部同名文件走 diff 覆盖提示 |
+| **本地同步** | CapabilitySet 已唯一，投影自动继承；非 Loom 的外部同名文件走 diff 覆盖提示 |
 
 ---
 
@@ -139,7 +139,7 @@ computeInstallKey(asset, tool):
 ## 8. 配套代码改动点
 
 1. **新增 `computeInstallKey(asset, tool)`**（`packages/adapter`）：按 §5 分派，复用 `aggregateMcps` 得到 serverKey；文件型用 `normalize(asset.name)`。
-2. **工作空间编排接口**：加入 Asset 时，对每个 `compatibleTool` 调 `computeInstallKey` 查重，撞键返回冲突信息供前端二选一；hook 放行追加。
+2. **能力集编排接口**：加入 Asset 时，对每个 `compatibleTool` 调 `computeInstallKey` 查重，撞键返回冲突信息供前端二选一；hook 放行追加。
 3. **name 归一化**：路径安全（处理 `/`、空格、大小写），不做激进 slug。
 4. **（可选）metadata 强类型**：把 `packages/shared/src/schemas.ts` 的 `assetMetadataSchema` 从 `z.union` 改为按 `type` 判别的 `z.discriminatedUnion("type", ...)`，杜绝 mcp 传空 metadata 蒙混。零争议纯增益。
 
@@ -157,4 +157,4 @@ computeInstallKey(asset, tool):
 
 ## 10. 一句话总结
 
-**UUID 管平台引用、落盘身份载体管工作空间。** 唯一性按 `(workspace, tool)` 分厂商各算一遍——厂商不支持的类型不参与；skill/rule/command/agent 按 `(tool, type, name)`、mcp 按 `(tool, 最终 serverKey)`、hook 按 `(tool, event, matcher)` 追加豁免；MCP/hook 的落盘文件路径厂商各异但唯一性维度一致。冲突在“加入工作空间”那一刻强制二选一。
+**UUID 管平台引用、落盘身份载体管能力集。** 唯一性按 `(能力集, tool)` 分厂商各算一遍——厂商不支持的类型不参与；skill/rule/command/agent 按 `(tool, type, name)`、mcp 按 `(tool, 最终 serverKey)`、hook 按 `(tool, event, matcher)` 追加豁免；MCP/hook 的落盘文件路径厂商各异但唯一性维度一致。冲突在“加入能力集”那一刻强制二选一。

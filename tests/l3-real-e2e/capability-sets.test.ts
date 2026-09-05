@@ -1,5 +1,5 @@
 /**
- * L3 Workspaces — POST 持久化 assetIds、GET 详情、DELETE、跨用户 403。
+ * L3 CapabilitySets — POST 持久化 assetIds、GET 详情、DELETE、跨用户 403。
  *
  * 真实 server 进程 + 真实 HTTP。
  * 不变量: 创建时 assetIds 不丢失、详情一致、删除后 404、非 owner 403。
@@ -8,7 +8,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { startServer, stopServer, type ServerHandle } from "@maolinc/cc-loom-testkit";
 import { login, request, parseJson } from "./_http.js";
 
-describe("L3 workspaces", () => {
+describe("L3 capability_sets", () => {
   let server: ServerHandle;
   let cookie: string;
 
@@ -35,7 +35,7 @@ describe("L3 workspaces", () => {
     const a1 = await createAsset("asset-1");
     const a2 = await createAsset("asset-2");
 
-    const create = await request(server.baseUrl, "POST", "/api/workspaces", {
+    const create = await request(server.baseUrl, "POST", "/api/capability-sets", {
       cookie,
       body: { name: "ws-with-assets", description: "preview should not be empty", targetTools: ["cursor"], visibility: "private", assetIds: [a1, a2] },
     });
@@ -44,16 +44,16 @@ describe("L3 workspaces", () => {
     expect(created.assets).toHaveLength(2);
     expect(created.assets.map((a: any) => a.id).sort()).toEqual([a1, a2].sort());
 
-    const detail = await request(server.baseUrl, "GET", `/api/workspaces/${created.id}`, { cookie });
+    const detail = await request(server.baseUrl, "GET", `/api/capability-sets/${created.id}`, { cookie });
     expect(detail.status).toBe(200);
     const detailData = (await parseJson<any>(detail)).data;
     expect(detailData.assets).toHaveLength(2);
     expect(detailData.assets.map((a: any) => a.id).sort()).toEqual([a1, a2].sort());
   });
 
-  it("POST without assetIds creates an empty workspace", async () => {
+  it("POST without assetIds creates an empty capabilitySet", async () => {
     await boot();
-    const create = await request(server.baseUrl, "POST", "/api/workspaces", {
+    const create = await request(server.baseUrl, "POST", "/api/capability-sets", {
       cookie,
       body: { name: "ws-empty", description: "no assets yet", targetTools: ["cursor"], visibility: "private" },
     });
@@ -61,32 +61,32 @@ describe("L3 workspaces", () => {
     expect((await parseJson<any>(create)).data.assets).toEqual([]);
   });
 
-  it("DELETE removes the workspace and its asset relations", async () => {
+  it("DELETE removes the capabilitySet and its asset relations", async () => {
     await boot();
     const a1 = await createAsset("asset-del");
-    const create = await request(server.baseUrl, "POST", "/api/workspaces", {
+    const create = await request(server.baseUrl, "POST", "/api/capability-sets", {
       cookie,
       body: { name: "ws-to-delete", description: "x", targetTools: ["cursor"], visibility: "private", assetIds: [a1] },
     });
     const wsId = (await parseJson<any>(create)).data.id;
 
-    const del = await request(server.baseUrl, "DELETE", `/api/workspaces/${wsId}`, { cookie });
+    const del = await request(server.baseUrl, "DELETE", `/api/capability-sets/${wsId}`, { cookie });
     expect(del.status).toBe(200);
 
-    const after = await request(server.baseUrl, "GET", `/api/workspaces/${wsId}`, { cookie });
+    const after = await request(server.baseUrl, "GET", `/api/capability-sets/${wsId}`, { cookie });
     expect(after.status).toBe(404);
   });
 
   it("DELETE by a non-owner returns 403", async () => {
     await boot();
-    const create = await request(server.baseUrl, "POST", "/api/workspaces", {
+    const create = await request(server.baseUrl, "POST", "/api/capability-sets", {
       cookie,
       body: { name: "ws-someone-elses", description: "x", targetTools: ["cursor"], visibility: "private" },
     });
     const wsId = (await parseJson<any>(create)).data.id;
 
     const otherCookie = await login(server.baseUrl, "intruder@example.com");
-    const del = await request(server.baseUrl, "DELETE", `/api/workspaces/${wsId}`, { cookie: otherCookie });
+    const del = await request(server.baseUrl, "DELETE", `/api/capability-sets/${wsId}`, { cookie: otherCookie });
     expect(del.status).toBe(403);
   });
 });

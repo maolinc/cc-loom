@@ -3,7 +3,7 @@ import { getAdapter } from "./registry.js";
 import { mcpServerKeysOf } from "./base.js";
 
 /**
- * 工作空间唯一性的“落盘身份载体”坐标。详见
+ * 能力集唯一性的“落盘身份载体”坐标。详见
  * docs/asset-uniqueness-design.md §4/§5。
  *
  * - `tool`：唯一性永远分厂商各算一遍（不同 targetDir 天然不互撞）。

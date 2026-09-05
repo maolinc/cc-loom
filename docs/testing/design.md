@@ -112,7 +112,7 @@ loom/
 │   ├── l5-ui/                      # L5 Playwright
 │   │   ├── login.spec.ts
 │   │   ├── asset-crud.spec.ts
-│   │   ├── workspace-composer.spec.ts
+│   │   ├── capability-set-composer.spec.ts
 │   │   ├── console.spec.ts
 │   │   └── ...
 │   └── fixtures/                   # 确定性测试数据 (构建进镜像)
@@ -120,10 +120,10 @@ loom/
 │       │   ├── generic-skills/
 │       │   ├── cc-plugin/
 │       │   └── empty-repo/
-│       ├── seed/                   # JSON seed (用户/asset/workspace)
+│       ├── seed/                   # JSON seed (用户/asset/能力集)
 │       │   ├── users.json
 │       │   ├── assets-six-types.json
-│       │   └── workspaces.json
+│       │   └── capability-sets.json
 │       ├── projects/               # 预制项目模板 (.cursor/ 等)
 │       │   ├── empty/
 │       │   ├── cursor-with-rules/
@@ -205,7 +205,7 @@ ENTRYPOINT ["node", "/opt/loom/testkit/runner.js"]
 | 仓库 | 内容 | 用途 |
 |------|------|------|
 | `generic-skills` | 2 个 skill（dir-layout + flat） | marketplace 导入测试 |
-| `cc-plugin` | claude-code-plugin 结构 | plugin workspace 导入 |
+| `cc-plugin` | claude-code-plugin 结构 | plugin 能力集 导入 |
 | `empty-repo` | 空仓库 | 边界：空导入 |
 
 marketplace 测试时把 `repos/<name>` 当作 `cloneOrFetch` 的源（替代真实 git URL）。
@@ -330,27 +330,27 @@ describe("L3: happy path 全链路", () => {
     if (server) await stopServer(server);
   });
 
-  it("登录→创建asset→组workspace→注册项目→安装→磁盘落盘", async () => {
+  it("登录→创建asset→组能力集→注册项目→安装→磁盘落盘", async () => {
     server = await startServer();
     api = new ApiClient(server.baseUrl);
     await api.login("alice@example.com");
     const token = await api.getCliToken();
 
     const skill = await api.createAsset(seed.skill("scout"));
-    const ws = await api.createWorkspace("ws1", [skill.id], ["cursor"]);
+    const capabilitySet = await api.createCapabilitySet("set1", [skill.id], ["cursor"]);
 
     projectRoot = makeProject("empty");
     agent = await startAgent({ endpoint: server.baseUrl, token, projectRoot });
 
     const plan = await api.installPlan({
-      projectId: agent.projectId, workspaceId: ws.id,
+      projectId: agent.projectId, capabilitySetId: capabilitySet.id,
       targetTools: ["cursor"], policy: "auto",
     });
     const result = await api.installExecute(plan);
     expect(result.errors).toEqual([]);
 
     expectDiskMatches(projectRoot, "expected/install-cursor-skill");
-    expectLock(agent.projectId, { policy: "auto", workspaceId: ws.id });
+    expectLock(agent.projectId, { policy: "auto", capabilitySetId: capabilitySet.id });
   });
 });
 ```
@@ -390,13 +390,13 @@ export const crossUserSync: Scenario = {
     { user: "bob", name: "bob-dev", project: "bob-proj", template: "empty" },
   ],
   steps: [
-    { actor: "user", target: "alice", desc: "创建 public workspace(2 asset)",
+    { actor: "user", target: "alice", desc: "创建 public 能力集(2 asset)",
       action: async (ctx) => {
-        ctx.state.ws = await ctx.api("alice").createWorkspace("shared", [a1,a2], ["cursor"], "public");
+        ctx.state.capabilitySet = await ctx.api("alice").createCapabilitySet("shared", [a1,a2], ["cursor"], "public");
       }},
-    { actor: "user", target: "bob", desc: "安装 alice 的 workspace",
+    { actor: "user", target: "bob", desc: "安装 alice 的 能力集",
       action: async (ctx) => {
-        await ctx.api("bob").install(ctx.devices.bob.projectId, ctx.state.ws.id, ["cursor"], "auto");
+        await ctx.api("bob").install(ctx.devices.bob.projectId, ctx.state.capabilitySet.id, ["cursor"], "auto");
       },
       assert: async (ctx) => {
         await expectAgentOnline(ctx.server, ctx.devices.bob.projectId);
@@ -404,7 +404,7 @@ export const crossUserSync: Scenario = {
       }},
     { actor: "user", target: "alice", desc: "更新成员 +1 asset",
       action: async (ctx) => {
-        await ctx.api("alice").updateWorkspace(ctx.state.ws.id, [a1,a2,a3]);
+        await ctx.api("alice").updateCapabilitySet(ctx.state.capabilitySet.id, [a1,a2,a3]);
       }},
     { actor: "server", desc: "等待 auto 同步",
       action: async (ctx) => { await waitForSync(ctx.server, ctx.devices.bob.projectId); },
@@ -592,7 +592,7 @@ Phase 1 只交付基础设施 + 以下 5 条 L3 用例，证明链路通：
 | 1 | `happy-path.test.ts` | 登录→创建→安装→落盘→lock 全链路通 |
 | 2 | `install-flow.test.ts` | 六类 asset × 四种 targetTool 落盘路径正确（含 D8: codex/claudecode） |
 | 3 | `token-lifecycle.test.ts` | 重生成 token → 旧 token agent 断连 → 新 token 重连 |
-| 4 | `drift-self-heal.test.ts` | lock 文件全缺 → scan 自动清 lock → server current_workspace 置空 |
+| 4 | `drift-self-heal.test.ts` | lock 文件全缺 → scan 自动清 lock → server current_capability_set 置空 |
 | 5 | `conflict-identity.test.ts` | 同名 skill 落盘冲突 → 409；MCP 聚合覆盖语义正确 |
 
 Phase 1 验收命令：
@@ -609,12 +609,12 @@ just test-docker-build && just test-docker-e2e
 
 | 维度 | 用例（示例） |
 |------|-------------|
-| 错误路径 | 登录错密码 / 创建 asset 校验失败 / 安装不存在的 workspace / push 同名 marketplace 409 |
-| 边界 | 空 content asset / >1MB content / page=0 / 并发创建同名 workspace |
+| 错误路径 | 登录错密码 / 创建 asset 校验失败 / 安装不存在的 能力集 / push 同名 marketplace 409 |
+| 边界 | 空 content asset / >1MB content / page=0 / 并发创建同名 能力集 |
 | 一致性 | drift 自愈 / orphan 清理 / lock 残留 / MCP 聚合冲突 / legacy lock 拒绝 toggle |
 | 同步 | auto 在线同步 / locked 不同步 / 离线补偿 / 重连重推 / 成员移除不补偿 |
 | 生命周期 | 安装→更新→卸载→重装 / token 重生成 / session 过期 / toggle 来回搬家 |
-| 并发 | 并发安装 / 并发 push / 并发创建 workspace |
+| 并发 | 并发安装 / 并发 push / 并发创建 能力集 |
 | 安全 | 路径穿越 / symlink 逃逸 / XSS content / 未授权访问私有 |
 
 ---

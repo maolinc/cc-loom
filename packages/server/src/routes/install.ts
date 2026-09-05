@@ -4,13 +4,13 @@ import { installRequestSchema } from "@maolinc/cc-loom-shared";
 import { requireAuth } from "../lib/auth.js";
 import type { LocalProjectState } from "@maolinc/cc-loom-shared";
 import { getAgent, requestFromAgent } from "../ws/gateway.js";
-import { maybeGcRetiredWorkspace } from "../lib/workspace-gc.js";
+import { maybeGcRetiredCapabilitySet } from "../lib/capability-set-gc.js";
 import { buildInstallPlan } from "../lib/reconcile.js";
 import { enqueueReconcileAndWait } from "../lib/outbox-worker-v2.js";
 import { ensureImplicitSubscription } from "../lib/subscriptions.js";
 
 /**
- * /api/install/plan 与 /api/install/execute 的路由层（ADR-0006 多空间订阅）。
+ * /api/install/plan 与 /api/install/execute 的路由层（ADR-0006 多能力集订阅）。
  *
  * - `/plan`:dry-run 预览。仍走 `buildInstallPlan`(adapter 渲染层),给 Web 看
  *   "这次操作会发生什么"，含结构化撞车清单 `conflictingAssets`（同名不同 id）。
@@ -50,7 +50,7 @@ export function installRoutes(app: FastifyInstance) {
       });
     }
 
-    // 预览仍用 buildInstallPlan 校验入参(项目/工作空间/工具集是否合法)。
+    // 预览仍用 buildInstallPlan 校验入参(项目/能力集/工具集是否合法)。
     // 实际落盘 plan 由 worker 在 reconcileProject 重新算,以 server 当前权威状态为准。
     const built = buildInstallPlan(request.user!.userId, parsed.data);
     if ("error" in built) {
@@ -83,33 +83,33 @@ export function installRoutes(app: FastifyInstance) {
     // 先写 server 权威状态再入队:reconcileProject 在 worker 端读 DB 算 plan,
     // 必须读到本次 execute 的订阅与跳过集。保存旧值以便失败回滚。
     const prevSub = db.prepare(
-      "SELECT sync_policy, target_tools FROM project_subscriptions WHERE project_id = ? AND workspace_id = ?",
-    ).get(parsed.data.projectId, parsed.data.workspaceId) as
+      "SELECT sync_policy, target_tools FROM project_subscriptions WHERE project_id = ? AND capability_set_id = ?",
+    ).get(parsed.data.projectId, parsed.data.capabilitySetId) as
       | { sync_policy: string; target_tools: string | null }
       | undefined;
     const prevExcludes = (db.prepare(
-      "SELECT asset_id FROM project_subscription_excludes WHERE project_id = ? AND workspace_id = ?",
-    ).all(parsed.data.projectId, parsed.data.workspaceId) as { asset_id: string }[])
+      "SELECT asset_id FROM project_subscription_excludes WHERE project_id = ? AND capability_set_id = ?",
+    ).all(parsed.data.projectId, parsed.data.capabilitySetId) as { asset_id: string }[])
       .map((r) => r.asset_id);
 
     const now = new Date().toISOString();
     ensureImplicitSubscription(parsed.data.projectId);
     db.prepare(
-      `INSERT INTO project_subscriptions (project_id, workspace_id, sync_policy, target_tools, installed_at)
+      `INSERT INTO project_subscriptions (project_id, capability_set_id, sync_policy, target_tools, installed_at)
        VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(project_id, workspace_id)
+       ON CONFLICT(project_id, capability_set_id)
        DO UPDATE SET sync_policy = excluded.sync_policy, target_tools = excluded.target_tools`,
     ).run(
-      parsed.data.projectId, parsed.data.workspaceId, parsed.data.policy,
+      parsed.data.projectId, parsed.data.capabilitySetId, parsed.data.policy,
       JSON.stringify(parsed.data.targetTools), now,
     );
     db.prepare(
-      "DELETE FROM project_subscription_excludes WHERE project_id = ? AND workspace_id = ?",
-    ).run(parsed.data.projectId, parsed.data.workspaceId);
+      "DELETE FROM project_subscription_excludes WHERE project_id = ? AND capability_set_id = ?",
+    ).run(parsed.data.projectId, parsed.data.capabilitySetId);
     const insExclude = db.prepare(
-      "INSERT OR IGNORE INTO project_subscription_excludes (project_id, workspace_id, asset_id) VALUES (?, ?, ?)",
+      "INSERT OR IGNORE INTO project_subscription_excludes (project_id, capability_set_id, asset_id) VALUES (?, ?, ?)",
     );
-    for (const id of skipSet) insExclude.run(parsed.data.projectId, parsed.data.workspaceId, id);
+    for (const id of skipSet) insExclude.run(parsed.data.projectId, parsed.data.capabilitySetId, id);
 
     const waitResult = await enqueueReconcileAndWait(deviceId, parsed.data.projectId, { force: true });
 
@@ -117,17 +117,17 @@ export function installRoutes(app: FastifyInstance) {
       // 失败:回滚订阅与跳过集,避免下一次 reconcile 把"用户没成功安装的订阅"再次推上去。
       if (prevSub) {
         db.prepare(
-          "UPDATE project_subscriptions SET sync_policy = ?, target_tools = ? WHERE project_id = ? AND workspace_id = ?",
-        ).run(prevSub.sync_policy, prevSub.target_tools, parsed.data.projectId, parsed.data.workspaceId);
+          "UPDATE project_subscriptions SET sync_policy = ?, target_tools = ? WHERE project_id = ? AND capability_set_id = ?",
+        ).run(prevSub.sync_policy, prevSub.target_tools, parsed.data.projectId, parsed.data.capabilitySetId);
       } else {
         db.prepare(
-          "DELETE FROM project_subscriptions WHERE project_id = ? AND workspace_id = ?",
-        ).run(parsed.data.projectId, parsed.data.workspaceId);
+          "DELETE FROM project_subscriptions WHERE project_id = ? AND capability_set_id = ?",
+        ).run(parsed.data.projectId, parsed.data.capabilitySetId);
       }
       db.prepare(
-        "DELETE FROM project_subscription_excludes WHERE project_id = ? AND workspace_id = ?",
-      ).run(parsed.data.projectId, parsed.data.workspaceId);
-      for (const id of prevExcludes) insExclude.run(parsed.data.projectId, parsed.data.workspaceId, id);
+        "DELETE FROM project_subscription_excludes WHERE project_id = ? AND capability_set_id = ?",
+      ).run(parsed.data.projectId, parsed.data.capabilitySetId);
+      for (const id of prevExcludes) insExclude.run(parsed.data.projectId, parsed.data.capabilitySetId, id);
       const detail = waitResult.kind === "fail" ? waitResult.error : `已跳过:${waitResult.reason}`;
       return reply.status(409).send({
         success: false,
@@ -145,7 +145,7 @@ export function installRoutes(app: FastifyInstance) {
         plan: built.plan,
         result: {
           success: true,
-          workspaceId: parsed.data.workspaceId,
+          capabilitySetId: parsed.data.capabilitySetId,
           projectId: parsed.data.projectId,
           completedAt: new Date().toISOString(),
           filesWritten: waitResult.data.filesWritten,

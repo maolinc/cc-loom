@@ -6,7 +6,7 @@
  * - 用户 B (bob): 安装后离线，再上线
  *
  * 流程:
- * 1. A 创建 skill + workspace (public)
+ * 1. A 创建 skill + capabilitySet (public)
  * 2. B 安装 (auto)
  * 3. B agent 停止（离线）
  * 4. A 修改 skill 内容
@@ -63,7 +63,7 @@ describe("L4 offline-compensate: 离线期间内容变更 → 上线补偿", () 
     await alice.login("alice@offline.com");
 
     const skill = await alice.createAsset(assetBuilders.skill("compensate-skill", ["cursor"]));
-    const ws = await alice.createWorkspace(
+    const ws = await alice.createCapabilitySet(
       { name: "ws-offline", description: "offline compensate", targetTools: ["cursor"], visibility: "public" },
       [skill.id],
     );
@@ -86,7 +86,7 @@ describe("L4 offline-compensate: 离线期间内容变更 → 上线补偿", () 
 
     await bob.installExecute({
       projectId: bobAgent.projectId,
-      workspaceId: ws.id,
+      capabilitySetId: ws.id,
       targetTools: ["cursor"],
       policy: "auto",
     });

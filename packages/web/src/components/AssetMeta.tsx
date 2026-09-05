@@ -17,7 +17,7 @@ interface AssetMetaProps {
   onClose: () => void;
   onChanged: () => void;
   /**
-   * limited：数据来自工作空间 payload 子集（完整详情不可得：已下架留存 / 私有无权）。
+   * limited：数据来自能力集 payload 子集（完整详情不可得：已下架留存 / 私有无权）。
    * 隐藏鉴权行（子集无 auth 字段，渲染会误显「免鉴权」）与全部操作按钮
    * （下载/编辑/删除/安装对这类能力必然失败）。
    */

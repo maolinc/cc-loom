@@ -285,8 +285,8 @@ export function applyReconcilePlan(
   const response: WsReconcileResponseData = {
     filesWritten: dedupe(filesWritten),
     filesRemoved: dedupe(filesRemoved),
-    lockWorkspaceIds: newLock.subscriptions
-      .map((s) => s.workspaceId)
+    lockCapabilitySetIds: newLock.subscriptions
+      .map((s) => s.capabilitySetId)
       .filter((id): id is string => id !== null),
     ...(migrationDisabled.length > 0 ? { migrationDisabled } : {}),
   };
@@ -390,7 +390,7 @@ function buildV2Lock(req: WsReconcileRequest, filesWritten: string[], failedAggP
 
   return {
     subscriptions: req.subscriptions,
-    version: new Date().toISOString(), // workspace 版本——v2 不再依赖此字段做决策，写时间戳便于排查
+    version: new Date().toISOString(), // 能力集版本——v2 不再依赖此字段做决策，写时间戳便于排查
     assets,
     aggregates: Object.keys(aggregates).length > 0 ? aggregates : undefined,
     lockFormat: "3",

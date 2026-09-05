@@ -21,7 +21,7 @@ function typeGroupLabel(type: AssetType): string {
 }
 
 interface Props {
-  type: "asset" | "workspace";
+  type: "asset" | "capabilitySet";
   id: string;
   onClose: () => void;
 }
@@ -35,7 +35,7 @@ export default function DetailPanel({ type, id, onClose }: Props) {
   const [expandedAssets, setExpandedAssets] = useState<Set<string>>(new Set());
   const [leftPanelWidth, setLeftPanelWidth] = useState(240);
   const resizing = useRef(false);
-  // Workspace mode: file `content` is NOT included in the detail payload (the
+  // CapabilitySet mode: file `content` is NOT included in the detail payload (the
   // server only returns path + size). We fetch each file's content on demand
   // and cache it per `assetId::path` for the lifetime of this panel instance.
   const fileCacheRef = useRef<Map<string, string>>(new Map());
@@ -43,9 +43,9 @@ export default function DetailPanel({ type, id, onClose }: Props) {
   const [fileLoading, setFileLoading] = useState(false);
   // 详情数据重载计数：编辑保存后自增以刷新当前面板内容。
   const [reloadTick, setReloadTick] = useState(0);
-  // 右栏视图（仅 workspace 模式）：点行选中能力后右栏整体切换为该能力的信息视图
-  // （对齐能力市场预览），顶部返回链接回到工作空间信息；树的展开/折叠不影响选中。
-  const [rightView, setRightView] = useState<"workspace" | "asset">("workspace");
+  // 右栏视图（仅 capabilitySet 模式）：点行选中能力后右栏整体切换为该能力的信息视图
+  // （对齐能力市场预览），顶部返回链接回到能力集信息；树的展开/折叠不影响选中。
+  const [rightView, setRightView] = useState<"capabilitySet" | "asset">("capabilitySet");
   // 选中能力的完整详情按需拉取（与文件内容同一按需模式），面板生命周期内缓存。
   // 缺失 = 未加载；"error" = 拉取失败（已下架留存 / 私有无权 / 网络）→ 回退子集渲染。
   const assetInfoCacheRef = useRef<Map<string, Asset | "error">>(new Map());
@@ -79,10 +79,10 @@ export default function DetailPanel({ type, id, onClose }: Props) {
     fileCacheRef.current = new Map();
     setFileTick(0);
     setFileLoading(false);
-    setRightView("workspace");
+    setRightView("capabilitySet");
     assetInfoCacheRef.current = new Map();
     setAssetInfoTick(0);
-    const endpoint = type === "asset" ? `/assets/${id}?lite=1` : `/workspaces/${id}`;
+    const endpoint = type === "asset" ? `/assets/${id}?lite=1` : `/capability-sets/${id}`;
     api.get<any>(endpoint, controller.signal).then((res) => {
       if (controller.signal.aborted) return;
       if (res.success && res.data) {
@@ -103,11 +103,11 @@ export default function DetailPanel({ type, id, onClose }: Props) {
             setActiveFilePath(primaryPath);
           }
         } else {
-          // Workspace: keep the tree fully collapsed on open. The user explicitly
+          // CapabilitySet: keep the tree fully collapsed on open. The user explicitly
           // expands what they want to inspect — no auto-selected asset, no
           // pre-expanded type group.
-          const ws = res.data;
-          const types = new Set<string>((ws.assets ?? []).map((a: Asset) => a.type));
+          const capabilitySet = res.data;
+          const types = new Set<string>((capabilitySet.assets ?? []).map((a: Asset) => a.type));
           setCollapsedGroups(types);
         }
       }
@@ -169,8 +169,8 @@ export default function DetailPanel({ type, id, onClose }: Props) {
   }, [activeFile, activeAsset]);
 
   // 文件内容按需加载：详情 payload 只带文件元信息（asset 模式走 ?lite=1，
-  // workspace 详情本就只返回 path/size），content 在用户查看某个文件时才
-  // 通过 /api/assets/:id/file 拉取并缓存。asset 模式用当前能力 id，workspace
+  // capabilitySet 详情本就只返回 path/size），content 在用户查看某个文件时才
+  // 通过 /api/assets/:id/file 拉取并缓存。asset 模式用当前能力 id，capabilitySet
   // 模式用选中的子能力 id。若详情已内联 content（非 lite 场景）则直接使用。
   const currentAssetId = isAsset ? id : activeAssetId;
   const activeFileContent = activeFile?.content;
@@ -198,9 +198,9 @@ export default function DetailPanel({ type, id, onClose }: Props) {
     return () => controller.abort();
   }, [currentAssetId, activeFilePath, activeFileContent]);
 
-  // 能力信息视图（workspace 模式）：选中成员能力的完整详情按需拉取并缓存。
+  // 能力信息视图（capabilitySet 模式）：选中成员能力的完整详情按需拉取并缓存。
   // lite=1 只要元信息（文件内容走上面的按需通道）。失败记 "error"，
-  // UI 回退用工作空间 payload 子集做 limited 渲染。
+  // UI 回退用能力集 payload 子集做 limited 渲染。
   const infoAssetId = !isAsset && rightView === "asset" ? activeAssetId : "";
   useEffect(() => {
     if (!infoAssetId) return;
@@ -251,18 +251,18 @@ export default function DetailPanel({ type, id, onClose }: Props) {
   }
 
   const asset = isAsset ? (data as Asset) : null;
-  const workspace = !isAsset ? data : null;
+  const capabilitySet = !isAsset ? data : null;
 
-  // 能力信息视图数据：完整详情（按需缓存）→ 失败回退工作空间 payload 子集 → 加载中骨架。
+  // 能力信息视图数据：完整详情（按需缓存）→ 失败回退能力集 payload 子集 → 加载中骨架。
   const showAssetInfo = !isAsset && rightView === "asset";
   const infoEntry = showAssetInfo ? assetInfoCacheRef.current.get(activeAssetId) : undefined;
   const infoAsset = infoEntry && infoEntry !== "error" ? infoEntry : null;
   const infoFailed = infoEntry === "error";
   const infoSubset = showAssetInfo ? allAssets.find((a) => a.id === activeAssetId) ?? null : null;
-  // 安装区：能力视图且完整详情已加载 → 单能力安装（对齐市场）；工作空间视图 → 工作空间安装。
+  // 安装区：能力视图且完整详情已加载 → 单能力安装（对齐市场）；能力集视图 → 能力集安装。
   // limited 回退（留存/无权）不渲染安装区——这些操作对该能力必然失败。
   const installAssetId = isAsset ? asset?.id : rightView === "asset" ? infoAsset?.id : undefined;
-  const installWorkspaceId = !isAsset && rightView === "workspace" ? workspace?.id : undefined;
+  const installCapabilitySetId = !isAsset && rightView === "capabilitySet" ? capabilitySet?.id : undefined;
 
   const handleAssetSelect = (assetId: string) => {
     const wasExpanded = expandedAssets.has(assetId);
@@ -413,15 +413,15 @@ export default function DetailPanel({ type, id, onClose }: Props) {
         <div className="w-[280px] shrink-0 border-l border-surface-sunken overflow-y-auto">
           <div className="p-4">
             {asset && <AssetMeta asset={asset} onClose={onClose} onChanged={() => setReloadTick((n) => n + 1)} />}
-            {workspace && rightView === "workspace" && <WorkspaceMeta workspace={workspace} onClose={onClose} />}
-            {workspace && rightView === "asset" && (
+            {capabilitySet && rightView === "capabilitySet" && <CapabilitySetMeta capabilitySet={capabilitySet} onClose={onClose} />}
+            {capabilitySet && rightView === "asset" && (
               <div>
                 <button
-                  onClick={() => setRightView("workspace")}
+                  onClick={() => setRightView("capabilitySet")}
                   className="flex items-center gap-0.5 text-xs text-text-muted hover:text-brand transition-colors mb-3"
                 >
                   <ChevronLeft size={12} />
-                  返回工作空间信息
+                  返回能力集信息
                 </button>
                 {infoAsset ? (
                   <AssetMeta asset={infoAsset} onClose={onClose} onChanged={() => setReloadTick((n) => n + 1)} />
@@ -441,9 +441,9 @@ export default function DetailPanel({ type, id, onClose }: Props) {
                 )}
               </div>
             )}
-            {(installAssetId || installWorkspaceId) && (
+            {(installAssetId || installCapabilitySetId) && (
               <div className="border-t border-surface-sunken mt-4 pt-4">
-                <InstallSection assetId={installAssetId} workspaceId={installWorkspaceId} />
+                <InstallSection assetId={installAssetId} capabilitySetId={installCapabilitySetId} />
               </div>
             )}
           </div>
@@ -470,35 +470,35 @@ function PanelShell({ children, onClose }: { children: React.ReactNode; onClose:
   );
 }
 
-function WorkspaceMeta({ workspace, onClose }: { workspace: any; onClose: () => void }) {
+function CapabilitySetMeta({ capabilitySet, onClose }: { capabilitySet: any; onClose: () => void }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const fromSource = !!(workspace.sourceId ?? workspace.source_id);
-  const sourceName = workspace.sourceDisplayName ?? workspace.source_display_name;
-  const sourceAddedBy = workspace.sourceAddedBy ?? workspace.source_added_by;
-  const sourceUrl = workspace.sourceUrl ?? workspace.source_url ?? workspace.source_repo_url;
-  const author = workspace.author;
-  // 作者：导入的工作空间显示导入者，本地创建的显示创建者。与能力详情面板对齐。
+  const fromSource = !!(capabilitySet.sourceId ?? capabilitySet.source_id);
+  const sourceName = capabilitySet.sourceDisplayName ?? capabilitySet.source_display_name;
+  const sourceAddedBy = capabilitySet.sourceAddedBy ?? capabilitySet.source_added_by;
+  const sourceUrl = capabilitySet.sourceUrl ?? capabilitySet.source_url ?? capabilitySet.source_repo_url;
+  const author = capabilitySet.author;
+  // 作者：导入的能力集显示导入者，本地创建的显示创建者。与能力详情面板对齐。
   const displayAuthor = fromSource ? (sourceAddedBy ?? author) : author;
   const isAdmin = !!user && user.role === "admin";
-  const canEdit = !!user && (isAdmin || workspace.user_id === user.userId);
+  const canEdit = !!user && (isAdmin || capabilitySet.user_id === user.userId);
   const canDelete = canEdit && (!fromSource || isAdmin);
 
   const onEdit = () => {
     onClose();
-    navigate(`/workspaces/${workspace.id}/edit`);
+    navigate(`/capability-sets/${capabilitySet.id}/edit`);
   };
 
   const onDelete = async () => {
     setDeleting(true);
-    const res = await api.delete<unknown>(`/workspaces/${workspace.id}`);
+    const res = await api.delete<unknown>(`/capability-sets/${capabilitySet.id}`);
     setDeleting(false);
     setConfirmDelete(false);
     if (res.success) {
-      toast.success("工作空间已删除", workspace.name);
+      toast.success("能力集已删除", capabilitySet.name);
       onClose();
     } else {
       toast.error("删除失败", res.error ?? "请稍后重试");
@@ -517,18 +517,18 @@ function WorkspaceMeta({ workspace, onClose }: { workspace: any; onClose: () => 
           </span>
         )}
         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-          workspace.visibility === "public" ? "bg-mcp-green-bg text-mcp-green-text" : "bg-surface-sunken text-text-muted"
+          capabilitySet.visibility === "public" ? "bg-mcp-green-bg text-mcp-green-text" : "bg-surface-sunken text-text-muted"
         }`}>
-          {workspace.visibility === "public" ? "公开" : "个人"}
+          {capabilitySet.visibility === "public" ? "公开" : "个人"}
         </span>
       </div>
-      <h2 className="text-lg font-bold text-text-primary mb-1 pr-8">{workspace.name}</h2>
-      <p className="text-sm text-text-secondary mb-3">{workspace.description}</p>
+      <h2 className="text-lg font-bold text-text-primary mb-1 pr-8">{capabilitySet.name}</h2>
+      <p className="text-sm text-text-secondary mb-3">{capabilitySet.description}</p>
 
       <div className="mb-3">
         <div className="text-xs font-semibold text-text-primary mb-1.5">目标工具</div>
         <div className="flex flex-wrap gap-1.5">
-          {sortTargetTools(workspace.targetTools || []).map((t: TargetTool) => (
+          {sortTargetTools(capabilitySet.targetTools || []).map((t: TargetTool) => (
             <span key={t} className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-soft">
               <ToolIcon tool={t} size={16} />
             </span>
@@ -539,13 +539,13 @@ function WorkspaceMeta({ workspace, onClose }: { workspace: any; onClose: () => 
       <div className="space-y-2 text-sm">
         {displayAuthor && <MetaRow label={fromSource ? "导入人" : "作者"} value={formatAuthorName(displayAuthor)} />}
         {fromSource && sourceName && <MetaRow label="来源" value={<SourceLink name={sourceName} url={sourceUrl} />} />}
-        <MetaRow label="能力数" value={`${workspace.assets?.length || 0}`} />
+        <MetaRow label="能力数" value={`${capabilitySet.assets?.length || 0}`} />
       </div>
 
-      <WorkspaceDownloadSection
-        workspaceId={workspace.id}
-        assets={(workspace.assets || []) as Asset[]}
-        defaultTools={(workspace.targetTools || []) as TargetTool[]}
+      <CapabilitySetDownloadSection
+        capabilitySetId={capabilitySet.id}
+        assets={(capabilitySet.assets || []) as Asset[]}
+        defaultTools={(capabilitySet.targetTools || []) as TargetTool[]}
       />
 
       {(canEdit || canDelete) && (
@@ -572,7 +572,7 @@ function WorkspaceMeta({ workspace, onClose }: { workspace: any; onClose: () => 
       <ConfirmDialog
         open={confirmDelete}
         kind="danger"
-        title={`删除工作空间「${workspace.name}」`}
+        title={`删除能力集「${capabilitySet.name}」`}
         description="此操作不可撤销。已安装到本地项目的内容不会自动移除。"
         confirmLabel="删除"
         confirmingLabel="删除中…"
@@ -585,16 +585,16 @@ function WorkspaceMeta({ workspace, onClose }: { workspace: any; onClose: () => 
 }
 
 /**
- * 工作空间下载：可选厂商多选。
+ * 能力集下载：可选厂商多选。
  *  - 不选厂商（默认）：按预览结构下载，所有成员能力完整包含。
  *  - 选厂商：走厂商安装结构，不兼容类型被排除；勾选后实时提示哪些能力会被排除。
  */
-function WorkspaceDownloadSection({
-  workspaceId,
+function CapabilitySetDownloadSection({
+  capabilitySetId,
   assets,
   defaultTools,
 }: {
-  workspaceId: string;
+  capabilitySetId: string;
   assets: Asset[];
   defaultTools: TargetTool[];
 }) {
@@ -622,11 +622,11 @@ function WorkspaceDownloadSection({
     setDownloading(true);
     const params = new URLSearchParams();
     if (selectedTools.length > 0) params.set("tool", selectedTools.join(","));
-    const url = `/api/workspaces/${workspaceId}/download${params.toString() ? `?${params}` : ""}`;
+    const url = `/api/capability-sets/${capabilitySetId}/download${params.toString() ? `?${params}` : ""}`;
     try {
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) {
-        toast.error("下载失败", res.status === 404 ? "工作空间不存在" : "请稍后重试");
+        toast.error("下载失败", res.status === 404 ? "能力集不存在" : "请稍后重试");
         return;
       }
       // 厂商模式下读取被跳过清单，提示用户哪些能力因不兼容未包含。
@@ -642,7 +642,7 @@ function WorkspaceDownloadSection({
       }
       const blob = await res.blob();
       const disp = res.headers.get("Content-Disposition") || "";
-      const filename = /filename="([^"]+)"/.exec(disp)?.[1] || "workspace.zip";
+      const filename = /filename="([^"]+)"/.exec(disp)?.[1] || "capability-set.zip";
       const objUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = objUrl;

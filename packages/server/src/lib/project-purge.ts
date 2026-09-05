@@ -13,7 +13,7 @@
  * 仅本项目引用时连带 asset_files（CASCADE）硬删，避免遗留孤立私有 asset。
  */
 import { db } from "../db/index.js";
-import { maybeGcRetiredWorkspace } from "./workspace-gc.js";
+import { maybeGcRetiredCapabilitySet } from "./capability-set-gc.js";
 
 /**
  * 清理项目在服务端 DB 的关联行 + 仅本项目引用的 adopt 产物。
@@ -34,7 +34,7 @@ export function purgeProjectDbRows(projectId: string): void {
     db.prepare("DELETE FROM project_subscription_excludes WHERE project_id = ?").run(projectId);
     for (const a of adoptedAssets) {
       const stillReferenced = !!db
-        .prepare("SELECT 1 FROM workspace_assets WHERE asset_id = ?")
+        .prepare("SELECT 1 FROM capability_set_assets WHERE asset_id = ?")
         .get(a.id)
         || !!db
           .prepare("SELECT 1 FROM project_installed_assets WHERE asset_id = ?")
@@ -47,7 +47,7 @@ export function purgeProjectDbRows(projectId: string): void {
 }
 
 /**
- * 硬删项目行：先清关联表（purgeProjectDbRows），再 DELETE projects 行 + GC 留存空间。
+ * 硬删项目行：先清关联表（purgeProjectDbRows），再 DELETE projects 行 + GC 留存能力集。
  * 返回是否确实删了一行（项目不存在时返回 false，调用方可据此判断）。
  */
 export function hardDeleteProject(projectId: string): boolean {
@@ -56,10 +56,10 @@ export function hardDeleteProject(projectId: string): boolean {
     | undefined;
   if (!row) return false;
   const subscribed = db.prepare(
-    "SELECT workspace_id FROM project_subscriptions WHERE project_id = ? AND workspace_id != ''",
-  ).all(projectId) as { workspace_id: string }[];
+    "SELECT capability_set_id FROM project_subscriptions WHERE project_id = ? AND capability_set_id != ''",
+  ).all(projectId) as { capability_set_id: string }[];
   purgeProjectDbRows(projectId);
   db.prepare("DELETE FROM projects WHERE id = ?").run(projectId);
-  for (const s of subscribed) maybeGcRetiredWorkspace(s.workspace_id);
+  for (const s of subscribed) maybeGcRetiredCapabilitySet(s.capability_set_id);
   return true;
 }

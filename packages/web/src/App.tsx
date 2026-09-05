@@ -5,14 +5,14 @@ import { AuthProvider, useAuth } from "./hooks/useAuth.js";
 import TopNav from "./components/TopNav.js";
 import LoginPage from "./pages/LoginPage.js";
 import HomePage from "./pages/HomePage.js";
-import WorkspaceListPage from "./pages/WorkspaceListPage.js";
+import CapabilitySetListPage from "./pages/CapabilitySetListPage.js";
 import KeepAlive from "./components/KeepAlive.js";
 import Button from "./components/Button.js";
 
 // 路由级代码分割：大页面按需加载，减小初始 bundle
 const LocalConsolePage = lazy(() => import("./pages/LocalConsolePage.js"));
 const AssetComposerPage = lazy(() => import("./pages/AssetComposerPage.js"));
-const WorkspaceComposerPage = lazy(() => import("./pages/WorkspaceComposerPage.js"));
+const CapabilitySetComposerPage = lazy(() => import("./pages/CapabilitySetComposerPage.js"));
 const DocsPage = lazy(() => import("./pages/DocsPage.js"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage.js"));
 
@@ -64,13 +64,13 @@ function AuthenticatedLayout() {
   // 主导航标签页：保持挂载、切换仅隐藏，避免重渲染 / 重新请求。
   const path = location.pathname;
   const isHome = path === "/";
-  const isWorkspaces = path === "/workspaces";
+  const isCapabilitySets = path === "/capability-sets";
   const isConsole = path === "/console";
   const isDocs = path === "/docs";
   const isSettings = path === "/settings";
-  // 其余为瞬时页面（工作空间编辑器、能力编辑器、404），走普通路由、用完即卸载。
-  const isCachedTab = isHome || isWorkspaces || isConsole || isDocs || isSettings;
-  const isPublicTab = isHome || isWorkspaces || isDocs;
+  // 其余为瞬时页面（能力集编辑器、能力编辑器、404），走普通路由、用完即卸载。
+  const isCachedTab = isHome || isCapabilitySets || isConsole || isDocs || isSettings;
+  const isPublicTab = isHome || isCapabilitySets || isDocs;
   const isProtectedPath = !isPublicTab;
   const shouldRenderProtectedArea = !!user || isProtectedPath;
 
@@ -88,8 +88,8 @@ function AuthenticatedLayout() {
           <KeepAlive active={isHome}>
             <HomePage />
           </KeepAlive>
-          <KeepAlive active={isWorkspaces}>
-            <WorkspaceListPage />
+          <KeepAlive active={isCapabilitySets}>
+            <CapabilitySetListPage />
           </KeepAlive>
           <KeepAlive active={isDocs}>
             <Suspense fallback={suspenseFallback}><DocsPage /></Suspense>
@@ -107,8 +107,8 @@ function AuthenticatedLayout() {
               {!isCachedTab && (
                 <Suspense fallback={suspenseFallback}>
                   <Routes>
-                    <Route path="/workspaces/new" element={<WorkspaceComposerPage />} />
-                    <Route path="/workspaces/:id/edit" element={<WorkspaceComposerPage />} />
+                    <Route path="/capability-sets/new" element={<CapabilitySetComposerPage />} />
+                    <Route path="/capability-sets/:id/edit" element={<CapabilitySetComposerPage />} />
                     <Route path="/assets/new" element={<AssetComposerPage />} />
                     <Route path="/assets/:id/edit" element={<AssetComposerPage />} />
                     <Route path="*" element={<NotFound />} />

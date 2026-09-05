@@ -4,7 +4,7 @@
  * 两种用法：
  *  - 普通版（kind="default"）：取消 + 确认，按钮主色为 brand。
  *  - 危险版（kind="danger"）：取消 + 危险红按钮，可选 `confirmText` 二次确认（用户必须输入指定字符串
- *    才能启用确认按钮，对应 LocalConsole 卸载工作空间的场景）。
+ *    才能启用确认按钮，对应 LocalConsole 卸载能力集的场景）。
  *
  * 设计：fixed 居中 + 半透明遮罩 + backdrop-blur + scale-in；ESC 关闭；
  * 确认时回调，关闭由父组件管理。

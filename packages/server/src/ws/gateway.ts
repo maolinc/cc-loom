@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { WebSocket as WsSocket } from "ws";
 import { db } from "../db/index.js";
-import { maybeGcRetiredWorkspace } from "../lib/workspace-gc.js";
+import { maybeGcRetiredCapabilitySet } from "../lib/capability-set-gc.js";
 import { reconcileInstalledAssets } from "../lib/asset-gc.js";
 import { isTrustedBrowserOrigin } from "../lib/runtime-security.js";
 import type {
@@ -124,7 +124,7 @@ export function broadcastToWebClients(type: string, payload: unknown): void {
 /**
  * agent 推送 LocalProjectState 时的副作用：
  *  1. 缓存
- *  2. drift 自动清空对齐：agent 端 lock 已清空（installedWorkspaceIds 为空）而服务端
+ *  2. drift 自动清空对齐：agent 端 lock 已清空（installedCapabilitySetIds 为空）而服务端
  *     仍有显式订阅 → 删除全部显式订阅（ADR-0006；server 是安装关系的权威，只做
  *     「清空」方向的对齐，不从 agent 侧新增订阅）
  *  3. 广播到 web 客户端，让活动页签重新拉取 /state
@@ -141,19 +141,19 @@ function ingestProjectState(state: LocalProjectState): void {
     .run(state.projectId);
 
   // drift 对齐仅在 agent 明确报告「lock 文件全缺失 → 已自动清 lock」（driftCleared）时
-  // 触发。不能用 installedWorkspaceIds 为空作判据：新项目 / 安装途中（订阅行已建、
+  // 触发。不能用 installedCapabilitySetIds 为空作判据：新项目 / 安装途中（订阅行已建、
   // lock 未写）/ 仅单独添加能力的项目都合法地为空，误删会把进行中的订阅清掉。
   if (state.driftCleared) {
     const subs = db.prepare(
-      "SELECT workspace_id FROM project_subscriptions WHERE project_id = ? AND workspace_id != ''",
-    ).all(state.projectId) as { workspace_id: string }[];
+      "SELECT capability_set_id FROM project_subscriptions WHERE project_id = ? AND capability_set_id != ''",
+    ).all(state.projectId) as { capability_set_id: string }[];
     if (subs.length > 0) {
-      db.prepare("DELETE FROM project_subscriptions WHERE project_id = ? AND workspace_id != ''")
+      db.prepare("DELETE FROM project_subscriptions WHERE project_id = ? AND capability_set_id != ''")
         .run(state.projectId);
       db.prepare("DELETE FROM project_subscription_excludes WHERE project_id = ?")
         .run(state.projectId);
-      // drift 自动清空 → 旧工作空间失去本项目引用，若已留存则尝试回收。
-      for (const s of subs) maybeGcRetiredWorkspace(s.workspace_id);
+      // drift 自动清空 → 旧能力集失去本项目引用，若已留存则尝试回收。
+      for (const s of subs) maybeGcRetiredCapabilitySet(s.capability_set_id);
     }
   }
 
@@ -261,10 +261,10 @@ export function websocketGateway(app: FastifyInstance) {
             socket.close();
             return;
           }
-          // ADR-0006 硬门槛:多空间订阅协议(subscriptionsV3),旧 CLI 拒连。
+          // ADR-0006 硬门槛:多能力集订阅协议(subscriptionsV3),旧 CLI 拒连。
           if (capabilities.subscriptionsV3 !== true) {
             send(socket, "error", {
-              message: "CLI 版本过旧:server 已支持多空间订阅,请升级 loom CLI 后重试",
+              message: "CLI 版本过旧:server 已支持多能力集订阅,请升级 loom CLI 后重试",
             });
             socket.close();
             return;
@@ -303,7 +303,7 @@ export function websocketGateway(app: FastifyInstance) {
           }
 
           send(socket, "auth_ok", { message: "已连接到 Loom" });
-          // 重连补偿：把离线期间的 workspace/asset 编辑追平到该设备的 auto 项目。
+          // 重连补偿：把离线期间的能力集/能力编辑追平到该设备的 auto 项目。
           if (deviceId && onAgentConnect) {
             try { onAgentConnect(deviceId); } catch (e) {
               console.warn(`[ws] onAgentConnect 失败 device=${deviceId} err=${(e as Error)?.message ?? e}`);

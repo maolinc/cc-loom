@@ -18,10 +18,10 @@
 | 包 | package name | 入口 | 职责 | 主要依赖 |
 |----|--------------|------|------|----------|
 | `packages/shared` | `@maolinc/cc-loom-shared` | `src/index.ts` | 公共常量、类型、Zod schema、Asset 布局判定 | `zod` |
-| `packages/adapter` | `@maolinc/cc-loom-adapter` | `src/index.ts` | 把 workspace manifest 转为各目标工具文件；合并策略；落盘身份判重 | `@maolinc/cc-loom-shared` |
+| `packages/adapter` | `@maolinc/cc-loom-adapter` | `src/index.ts` | 把 能力集 manifest 转为各目标工具文件；合并策略；落盘身份判重 | `@maolinc/cc-loom-shared` |
 | `packages/server` | `@maolinc/cc-loom-server` | `src/index.ts` | Fastify API、SQLite、WebSocket gateway、Marketplace 同步、静态托管 web dist | `@maolinc/cc-loom-shared`、`@maolinc/cc-loom-adapter`、Fastify、`better-sqlite3` |
 | `packages/cli` | `loom` | `src/index.ts` | CLI 命令、本地 Agent、WebSocket 客户端、项目注册、安装落盘、扫描/watch | `@maolinc/cc-loom-shared`、`@maolinc/cc-loom-adapter`、Commander、Ink、ws、chokidar |
-| `packages/web` | `@maolinc/cc-loom-web` | `src/main.tsx` / `src/App.tsx` | React + Vite SPA，能力市场、工作空间、本地控制台、设置页 | `@maolinc/cc-loom-shared`、React、React Router、Radix UI、Tailwind |
+| `packages/web` | `@maolinc/cc-loom-web` | `src/main.tsx` / `src/App.tsx` | React + Vite SPA，能力市场、能力集、本地控制台、设置页 | `@maolinc/cc-loom-shared`、React、React Router、Radix UI、Tailwind |
 
 依赖边界：
 
@@ -53,8 +53,8 @@ CLI Agent（loom start）
 
 关键路径：
 
-1. Web 创建/编辑 `Asset`、`Workspace` → Server 写 SQLite。
-2. Web 对项目生成安装计划 → Server 用 `@maolinc/cc-loom-adapter` 把 workspace manifest 转成 `InstallPlan.diff`。
+1. Web 创建/编辑 `Asset`、`CapabilitySet` → Server 写 SQLite。
+2. Web 对项目生成安装计划 → Server 用 `@maolinc/cc-loom-adapter` 把 能力集 manifest 转成 `InstallPlan.diff`。
 3. Web 执行安装 → Server 通过 WebSocket 投递给在线 CLI Agent。
 4. CLI Agent 在本机项目目录安全写文件，更新 `~/.loom/locks/<projectId>.json`。
 5. CLI Agent 扫描目标工具目录并推送 `LocalProjectState`。
@@ -75,8 +75,8 @@ CLI Agent（loom start）
 | `users` / `sessions` / `cli_tokens` | Web 登录态和 CLI Token |
 | `devices` | CLI Agent 设备绑定与在线状态 |
 | `assets` / `asset_files` | 能力元数据和多文件内容 |
-| `workspaces` / `workspace_assets` | 工作空间及其能力成员 |
-| `projects` | 已注册本地项目、当前 workspace、同步策略 |
+| `capability_sets` / `capability_set_assets` | 能力集及其能力成员 |
+| `projects` | 已注册本地项目、当前 能力集、同步策略 |
 | `project_installed_assets` | 服务端镜像账本，以 Agent 上报的真实安装集合对账 |
 | `marketplace_sources` / `marketplace_sync_logs` | 外部来源和同步日志 |
 | `app_settings` | 应用设置，如 Marketplace 轮询间隔 |
@@ -89,7 +89,7 @@ CLI Agent（loom start）
 |------|------|
 | `~/.loom/config.json` | endpoint、CLI token、deviceId |
 | `~/.loom/projects/<id>.json` | 本机注册项目记录 |
-| `~/.loom/locks/<projectId>.json` | Loom 管理文件账本、工作空间、策略、能力开关 |
+| `~/.loom/locks/<projectId>.json` | Loom 管理文件账本、能力集、策略、能力开关 |
 | `~/.loom/logs/agent.log` | 后台 Agent 日志，轮转写入 |
 | `~/.loom/disabled/<projectId>/...` | 单项能力关闭时的隔离副本 |
 | `~/.loom/agent.pid` | 后台 Agent pidfile |

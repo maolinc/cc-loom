@@ -58,5 +58,5 @@ export async function unregisterCommand(options: UnregisterOptions = {}): Promis
   blank();
   tip("已清理本地记录、lock、隔离区与 skill 统计");
   tip("工具目录（.cursor/.codebuddy/.codex/.claude）未被删除");
-  tip("如需清理工具目录文件，请手动删除或重新安装别的 Workspace 覆盖");
+  tip("如需清理工具目录文件，请手动删除或重新安装别的 CapabilitySet 覆盖");
 }

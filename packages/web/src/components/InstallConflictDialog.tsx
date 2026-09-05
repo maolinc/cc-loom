@@ -16,8 +16,8 @@ import Button from "./Button.js";
 
 interface Props {
   conflicts: InstallConflict[];
-  /** 工作空间名，用于副标题。 */
-  workspaceName?: string;
+  /** 能力集名，用于副标题。 */
+  capabilitySetName?: string;
   busy?: boolean;
   /** 用户确认：携带跳过的 incomingAssetId 集合（恒为全部撞车项）。 */
   onConfirm: (skipAssetIds: string[]) => void;
@@ -26,7 +26,7 @@ interface Props {
 
 export default function InstallConflictDialog({
   conflicts,
-  workspaceName,
+  capabilitySetName,
   busy = false,
   onConfirm,
   onCancel,
@@ -52,7 +52,7 @@ export default function InstallConflictDialog({
   return (
     <Modal
       title="发现同名能力撞车"
-      subtitle={`待安装${workspaceName ? `「${workspaceName}」` : "的空间"}中有 ${conflicts.length} 项能力与项目现有能力同名但非同一份，落盘路径必然冲突。请选择跳过这些能力后继续安装；跳过仅对本次生效，之后冲突方移除可重装补齐。`}
+      subtitle={`待安装${capabilitySetName ? `「${capabilitySetName}」` : "的能力集"}中有 ${conflicts.length} 项能力与项目现有能力同名但非同一份，落盘路径必然冲突。请选择跳过这些能力后继续安装；跳过仅对本次生效，之后冲突方移除可重装补齐。`}
       onClose={onCancel}
       busy={busy}
       width="w-[560px]"

@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Boxes, Plus } from "lucide-react";
 import { api } from "../api.js";
-import type { Workspace } from "@maolinc/cc-loom-shared";
-import WorkspaceCard from "../components/WorkspaceCard.js";
+import type { CapabilitySet } from "@maolinc/cc-loom-shared";
+import CapabilitySetCard from "../components/CapabilitySetCard.js";
 import DetailPanel from "../components/DetailPanel.js";
 import SearchInput from "../components/SearchInput.js";
 import Button from "../components/Button.js";
@@ -11,12 +11,12 @@ import { CardGridSkeleton, ErrorState, EmptyState } from "../components/PageStat
 import { useRevalidateOnActive } from "../components/KeepAlive.js";
 import { useAuth } from "../hooks/useAuth.js";
 
-type WorkspaceRow = Workspace & { assetIds?: string[]; assetTypes?: string[] };
+type CapabilitySetRow = CapabilitySet & { assetIds?: string[]; assetTypes?: string[] };
 
-export default function WorkspaceListPage() {
+export default function CapabilitySetListPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [workspaces, setWorkspaces] = useState<WorkspaceRow[]>([]);
+  const [capabilitySets, setCapabilitySets] = useState<CapabilitySetRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [visibility, setVisibility] = useState<string>("");
@@ -32,14 +32,14 @@ export default function WorkspaceListPage() {
     params.set("pageSize", "30");
     setLoading(true);
     setError(null);
-    const res = await api.get<WorkspaceRow[]>(`/workspaces?${params}`, signal);
+    const res = await api.get<CapabilitySetRow[]>(`/capability-sets?${params}`, signal);
     if (signal?.aborted) return;
     setLoading(false);
     if (res.success && res.data) {
-      setWorkspaces(res.data);
+      setCapabilitySets(res.data);
     } else {
-      setWorkspaces([]);
-      setError(res.error || "无法加载工作空间");
+      setCapabilitySets([]);
+      setError(res.error || "无法加载能力集");
     }
   }, [user, visibility, search]);
 
@@ -49,12 +49,12 @@ export default function WorkspaceListPage() {
     return () => controller.abort();
   }, [fetch]);
 
-  // 缓存页：从其它导航切回时静默刷新，保证新建/编辑后的工作空间及时出现。
+  // 缓存页：从其它导航切回时静默刷新，保证新建/编辑后的能力集及时出现。
   // 同时递增 refreshKey，让已打开的 DetailPanel 重新挂载、拉取最新数据。
   useRevalidateOnActive(() => { void fetch(); setRefreshKey((k) => k + 1); });
 
   const filtering = !!search || (!!user && !!visibility);
-  const createWorkspace = () => navigate(user ? "/workspaces/new" : "/login");
+  const createCapabilitySet = () => navigate(user ? "/capability-sets/new" : "/login");
 
   return (
     <div>
@@ -64,7 +64,7 @@ export default function WorkspaceListPage() {
             query={search}
             onQueryChange={setSearch}
             showTypes={false}
-            placeholder="搜索工作空间…"
+            placeholder="搜索能力集…"
             manualSubmit
             loading={loading}
             extraFilters={
@@ -88,30 +88,30 @@ export default function WorkspaceListPage() {
         </div>
       </div>
 
-      {loading && workspaces.length === 0 ? (
+      {loading && capabilitySets.length === 0 ? (
         <CardGridSkeleton count={6} />
-      ) : error && workspaces.length === 0 ? (
+      ) : error && capabilitySets.length === 0 ? (
         <ErrorState message={error} onRetry={fetch} />
-      ) : workspaces.length === 0 ? (
+      ) : capabilitySets.length === 0 ? (
         <EmptyState
           icon={<Boxes className="w-8 h-8" />}
-          title={filtering ? "没有匹配的工作空间" : "还没有工作空间"}
-          description={filtering ? "试试更换关键词或可见性筛选。" : user ? "创建一个工作空间，把常用能力组合在一起，一次性安装到项目。" : "公开工作空间会展示在这里，登录后可以创建和管理自己的空间。"}
+          title={filtering ? "没有匹配的能力集" : "还没有能力集"}
+          description={filtering ? "试试更换关键词或可见性筛选。" : user ? "创建一个能力集，把常用能力组合在一起，一次性安装到项目。" : "公开能力集会展示在这里，登录后可以创建和管理自己的能力集。"}
           action={
             filtering ? (
               <Button variant="secondary" onClick={() => { setSearch(""); setVisibility(""); }}>清除筛选</Button>
             ) : (
-              <Button variant="primary" leftIcon={<Plus size={15} />} onClick={createWorkspace}>新建工作空间</Button>
+              <Button variant="primary" leftIcon={<Plus size={15} />} onClick={createCapabilitySet}>新建能力集</Button>
             )
           }
         />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
-          {workspaces.map((w, i) => (
-            <WorkspaceCard
-              key={w.id}
-              workspace={w}
-              onClick={() => setSelected(w.id)}
+          {capabilitySets.map((capabilitySet, i) => (
+            <CapabilitySetCard
+              key={capabilitySet.id}
+              capabilitySet={capabilitySet}
+              onClick={() => setSelected(capabilitySet.id)}
               className="animate-card-in"
               style={{ animationDelay: `${Math.min(i, 12) * 35}ms` }}
             />
@@ -120,7 +120,7 @@ export default function WorkspaceListPage() {
       )}
 
       {selected && (
-        <DetailPanel key={`${selected}-${refreshKey}`} type="workspace" id={selected} onClose={() => { setSelected(null); void fetch(); }} />
+        <DetailPanel key={`${selected}-${refreshKey}`} type="capabilitySet" id={selected} onClose={() => { setSelected(null); void fetch(); }} />
       )}
     </div>
   );

@@ -3,7 +3,7 @@
  *
  * CLI 读取本地厂商目录、解析为 ImportedAsset[] 后发送。Server 负责：
  * 1. 逐个 asset 按 (author, type, name, source_id IS NULL) upsert。
- * 2. 按 (user_id, name) 查找工作空间——存在则覆盖成员，不存在则新建。
+ * 2. 按 (user_id, name) 查找能力集——存在则覆盖成员，不存在则新建。
  * 3. 对失联 asset 调 maybeGcRetiredAsset。
  *
  * 认证：requireCliAuth（CLI Bearer token）。
@@ -109,40 +109,40 @@ export function pushRoutes(app: FastifyInstance) {
       }
     }
 
-    // ---- 2. Find or create workspace (by user_id + name) ----
+    // ---- 2. Find or create capabilitySet (by user_id + name) ----
     const existingWs = db.prepare(
-      "SELECT id, source_id FROM workspaces WHERE user_id = ? AND name = ? AND deleted_at IS NULL",
+      "SELECT id, source_id FROM capability_sets WHERE user_id = ? AND name = ? AND deleted_at IS NULL",
     ).get(userId, name) as { id: string; source_id: string | null } | undefined;
 
-    let workspaceId: string;
+    let capabilitySetId: string;
     let created: boolean;
 
     if (existingWs) {
-      // 来自 marketplace 的 workspace 不允许 push 覆盖
+      // 来自 marketplace 的 capabilitySet 不允许 push 覆盖
       if (existingWs.source_id) {
         return reply.status(409).send({
           success: false,
-          error: `工作空间「${name}」来自数据来源，不能被推送覆盖，请更换名称`,
+          error: `能力集「${name}」来自数据来源，不能被推送覆盖，请更换名称`,
         });
       }
-      workspaceId = existingWs.id;
+      capabilitySetId = existingWs.id;
       created = false;
 
       db.prepare(`
-        UPDATE workspaces
+        UPDATE capability_sets
         SET description = ?, target_tools = ?, visibility = ?, version = ?, updated_at = ?
         WHERE id = ?
-      `).run(`由 loom push 推送（${targetTool}）`, toolsJson, visibility, "1.0.0", now, workspaceId);
+      `).run(`由 loom push 推送（${targetTool}）`, toolsJson, visibility, "1.0.0", now, capabilitySetId);
 
       // 记录旧成员用于 GC
-      const oldAssetIds = (db.prepare("SELECT asset_id FROM workspace_assets WHERE workspace_id = ?")
-        .all(workspaceId) as { asset_id: string }[]).map((r) => r.asset_id);
+      const oldAssetIds = (db.prepare("SELECT asset_id FROM capability_set_assets WHERE capability_set_id = ?")
+        .all(capabilitySetId) as { asset_id: string }[]).map((r) => r.asset_id);
 
       // 全量替换成员
-      db.prepare("DELETE FROM workspace_assets WHERE workspace_id = ?").run(workspaceId);
+      db.prepare("DELETE FROM capability_set_assets WHERE capability_set_id = ?").run(capabilitySetId);
       for (const assetId of assetIds) {
-        db.prepare("INSERT INTO workspace_assets (id, workspace_id, asset_id) VALUES (?, ?, ?)")
-          .run(generateId(), workspaceId, assetId);
+        db.prepare("INSERT INTO capability_set_assets (id, capability_set_id, asset_id) VALUES (?, ?, ?)")
+          .run(generateId(), capabilitySetId, assetId);
       }
 
       // 失联 asset 尝试 GC
@@ -151,23 +151,23 @@ export function pushRoutes(app: FastifyInstance) {
         if (!afterSet.has(oldId)) maybeGcRetiredAsset(oldId);
       }
     } else {
-      workspaceId = generateId();
+      capabilitySetId = generateId();
       created = true;
 
       db.prepare(`
-        INSERT INTO workspaces (id, user_id, name, description, target_tools, visibility, version, created_at, updated_at)
+        INSERT INTO capability_sets (id, user_id, name, description, target_tools, visibility, version, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(workspaceId, userId, name, `由 loom push 推送（${targetTool}）`, toolsJson, visibility, "1.0.0", now, now);
+      `).run(capabilitySetId, userId, name, `由 loom push 推送（${targetTool}）`, toolsJson, visibility, "1.0.0", now, now);
 
       for (const assetId of assetIds) {
-        db.prepare("INSERT INTO workspace_assets (id, workspace_id, asset_id) VALUES (?, ?, ?)")
-          .run(generateId(), workspaceId, assetId);
+        db.prepare("INSERT INTO capability_set_assets (id, capability_set_id, asset_id) VALUES (?, ?, ?)")
+          .run(generateId(), capabilitySetId, assetId);
       }
     }
 
     return {
       success: true,
-      data: { workspaceId, workspaceName: name, created, assetCount: assetIds.length },
+      data: { capabilitySetId, capabilitySetName: name, created, assetCount: assetIds.length },
     };
   });
 }

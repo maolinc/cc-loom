@@ -31,7 +31,7 @@
 | 调整安装/卸载/单项能力开关 | `shared-and-adapter.md` → `server-flows.md` → `cli-agent-flows.md` |
 | 调整项目本地镜像或本地控制台 | `cli-agent-flows.md` → `server-flows.md` → `web-flows.md` |
 | 修改登录、CLI Token、设备绑定 | `server-flows.md` → `cli-agent-flows.md` → `web-flows.md` |
-| 修改能力市场或工作空间编辑 | `server-flows.md` → `web-flows.md` |
+| 修改能力市场或能力集编辑 | `server-flows.md` → `web-flows.md` |
 | 修改 Marketplace 导入/同步 | `server-flows.md` |
 | 修改 UI 页面布局或路由 | `web-flows.md`，涉及设计时另读 `ui-design-spec.md` |
 

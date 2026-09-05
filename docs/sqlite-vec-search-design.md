@@ -3,7 +3,7 @@
 > 状态：需求/设计草案，待关键决策确认后进入实现。
 >
 > 代码事实来源（调研于 2026-07-09）：
-> - 搜索现状：`packages/server/src/routes/assets.ts`、`packages/server/src/routes/workspaces.ts`
+> - 搜索现状：`packages/server/src/routes/assets.ts`、`packages/server/src/routes/capability-sets.ts`
 > - DB schema：`packages/server/src/db/migrate.ts`、`packages/server/src/db/index.ts`
 > - 导入链路：`packages/server/src/marketplace/pipeline.ts`（`diffAndUpsertAssets`）、`packages/server/src/routes/assets.ts`（POST/PUT）
 > - AI 配置：`packages/server/src/lib/user-ai-settings.ts`、`packages/server/src/routes/ai.ts`
@@ -26,7 +26,7 @@
 
 ### 1.3 非目标（本期不做）
 
-- 工作空间（`/api/workspaces`）搜索增强——用户明确范围为「能力市场」。架构上预留复用空间，但不在本期实现。
+- 能力集（`/api/capability-sets`）搜索增强——用户明确范围为「能力市场」。架构上预留复用空间，但不在本期实现。
 - 跨语言翻译、多模态（图像/代码 AST）向量化。
 - 全文检索结果高亮、片段截取（snippet）UI——可选增强，非核心。
 - 引入外部托管向量库（Pinecone/Weaviate 等）——保持 SQLite 单文件。

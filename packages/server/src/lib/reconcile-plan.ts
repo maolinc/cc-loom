@@ -7,8 +7,8 @@
  * 设计：
  *  - 纯读侧：只查 DB + 调 @maolinc/cc-loom-adapter 渲染，不写任何表，不联系 CLI。
  *    调用方负责入队 / 投递 / 写账本。
- *  - 受管集 = ∪（每条活跃显式订阅的 workspace_assets − 撞车跳过集） ∪ project_capabilities
- *    （ADR-0006 多空间订阅）。同一 asset id 跨订阅共享单例，按 (能力 × 厂商) 引用计数：
+ *  - 受管集 = ∪（每条活跃显式订阅的 capability_set_assets − 撞车跳过集） ∪ project_capabilities
+ *    （ADR-0006 多能力集订阅）。同一 asset id 跨订阅共享单例，按 (能力 × 厂商) 引用计数：
  *    某 (asset, tool) 仅当仍有订阅覆盖该 tool 时才渲染。project_capabilities 来自本地
  *    控制台 adopt / 单独添加（per-project、不扇出，工具集跟随项目有效工具）。
  *  - `removed`：以 `project_installed_assets` 为"上次 plan asset 全集"账本。
@@ -18,7 +18,7 @@
  *    foreign 条目。避免整文件重算抹掉用户手写配置。
  *  - 可见性过滤口径与 lib/reconcile.ts:buildInstallPlan / asset-manifest.loadAssetEntries
  *    保持一致：private asset 仅当 author === project owner email 时放行。
- *  - 工作空间为空 / 已软删时：workspace_assets 不计入，但 project_capabilities 仍生效；
+ *  - 能力集为空 / 已软删时：capability_set_assets 不计入，但 project_capabilities 仍生效；
  *    若两者皆空则进入清空状态（removed = 上次账本全集，聚合 entries 为空）。
  */
 import type {
@@ -41,7 +41,7 @@ import { db } from "../db/index.js";
 import { loadAssetEntries } from "./asset-manifest.js";
 import { applyPathBindings, loadAuthBindings, loadDistributedCredentials } from "./credential-inject.js";
 import {
-  IMPLICIT_WORKSPACE_ID,
+  IMPLICIT_CAPABILITY_SET_ID,
   loadExcludes,
   loadSubscriptionRows,
   projectEffectiveTools,
@@ -50,7 +50,7 @@ import {
 export type ReconcileProjectOk = {
   plan: ReconcilePlan;
   /** 显式订阅快照（含名称富化），写入 CLI lock 与 op 请求。 */
-  subscriptions: import("@maolinc/cc-loom-shared").WorkspaceSubscription[];
+  subscriptions: import("@maolinc/cc-loom-shared").CapabilitySetSubscription[];
   targetTools: TargetTool[];
 };
 export type ReconcileProjectErr = { error: string; status: 404 };
@@ -83,11 +83,11 @@ function toReconcileFile(f: AdapterFile): ReconcileFile {
 /**
  * 加载项目受管 asset 全集与 (asset → 渲染工具集) 归属（ADR-0006 多订阅模型）。
  *
- * 受管集 = ∪（每条活跃显式订阅的 workspace_assets − 撞车跳过集） ∪ project_capabilities
+ * 受管集 = ∪（每条活跃显式订阅的 capability_set_assets − 撞车跳过集） ∪ project_capabilities
  * （隐式订阅）。同一 asset id 跨订阅共享单例：assetTools 取各订阅覆盖工具的并集。
  *
- * - 显式订阅的渲染工具 = 订阅 target_tools ∩ 工作空间当前声明 target_tools
- *   （尊重空间作者后续收窄厂商）；空间已软删 → 该订阅不活跃，成员不计入。
+ * - 显式订阅的渲染工具 = 订阅 target_tools ∩ 能力集当前声明 target_tools
+ *   （尊重能力集作者后续收窄厂商）；能力集已软删 → 该订阅不活跃，成员不计入。
  * - 隐式订阅（project_capabilities）的渲染工具 = 项目有效工具集合。
  * - 含留存（软删）asset，保证 mcp/hook 聚合重算拿得到内容；可见性由 loadAssetEntries 过滤。
  */
@@ -99,7 +99,7 @@ function loadManaged(
   entries: ManifestAssetEntry[];
   assetTools: Map<string, Set<TargetTool>>;
   effectiveTools: TargetTool[];
-  subscriptions: import("@maolinc/cc-loom-shared").WorkspaceSubscription[];
+  subscriptions: import("@maolinc/cc-loom-shared").CapabilitySetSubscription[];
 } {
   const projectTools = projectEffectiveTools(project);
   const assetTools = new Map<string, Set<TargetTool>>();
@@ -109,32 +109,32 @@ function loadManaged(
     assetTools.set(assetId, set);
   };
 
-  const subscriptions: import("@maolinc/cc-loom-shared").WorkspaceSubscription[] = [];
+  const subscriptions: import("@maolinc/cc-loom-shared").CapabilitySetSubscription[] = [];
   for (const sub of loadSubscriptionRows(projectId)) {
-    if (sub.workspace_id === IMPLICIT_WORKSPACE_ID) continue; // 隐式订阅不进快照
-    const ws = db
-      .prepare("SELECT id, name, deleted_at, target_tools FROM workspaces WHERE id = ?")
-      .get(sub.workspace_id) as
+    if (sub.capability_set_id === IMPLICIT_CAPABILITY_SET_ID) continue; // 隐式订阅不进快照
+    const capabilitySet = db
+      .prepare("SELECT id, name, deleted_at, target_tools FROM capability_sets WHERE id = ?")
+      .get(sub.capability_set_id) as
       | { id: string; name: string; deleted_at: string | null; target_tools: string }
       | undefined;
-    if (!ws) continue; // 空间行已不存在（GC 后悬挂订阅）：视为不活跃
+    if (!capabilitySet) continue; // 能力集行已不存在（GC 后悬挂订阅）：视为不活跃
     subscriptions.push({
-      workspaceId: ws.id,
-      workspaceName: ws.name,
+      capabilitySetId: capabilitySet.id,
+      capabilitySetName: capabilitySet.name,
       syncPolicy: (sub.sync_policy === "locked" ? "locked" : "auto") as SyncPolicy,
       targetTools: sub.target_tools ? (JSON.parse(sub.target_tools) as TargetTool[]) : null,
       installedAt: sub.installed_at,
-      ...(ws.deleted_at ? { retained: true } : {}),
+      ...(capabilitySet.deleted_at ? { retained: true } : {}),
     });
-    if (ws.deleted_at) continue; // 留存空间：成员不计入受管集（与旧 wsActive 口径一致）
+    if (capabilitySet.deleted_at) continue; // 留存能力集：成员不计入受管集
     const subTools = sub.target_tools ? (JSON.parse(sub.target_tools) as TargetTool[]) : projectTools;
-    const wsTools = JSON.parse(ws.target_tools || "[]") as TargetTool[];
-    const tools = subTools.filter((t) => wsTools.includes(t));
+    const capabilitySetTools = JSON.parse(capabilitySet.target_tools || "[]") as TargetTool[];
+    const tools = subTools.filter((t) => capabilitySetTools.includes(t));
     if (tools.length === 0) continue;
-    const excludes = loadExcludes(projectId, ws.id);
+    const excludes = loadExcludes(projectId, capabilitySet.id);
     const rows = db
-      .prepare("SELECT asset_id FROM workspace_assets WHERE workspace_id = ?")
-      .all(ws.id) as { asset_id: string }[];
+      .prepare("SELECT asset_id FROM capability_set_assets WHERE capability_set_id = ?")
+      .all(capabilitySet.id) as { asset_id: string }[];
     for (const r of rows) {
       if (excludes.has(r.asset_id)) continue;
       addTools(r.asset_id, tools);
@@ -155,13 +155,13 @@ function loadManaged(
  * 构造所有 (tool, type) 的聚合 merge-spec。
  *
  * 覆盖**全部厂商**（不只是 effectiveTools）：当某厂商从 effectiveTools 退出（切到
- * 不声明该厂商的工作空间 / 项目 targets 变化）时，该厂商此前写进聚合文件的 owned
+ * 不声明该厂商的能力集 / 项目 targets 变化）时，该厂商此前写进聚合文件的 owned
  * 条目必须被清掉、foreign 用户内容必须保留。若只为 effectiveTools 算聚合，dropped
  * 厂商的聚合文件不会出现在 plan.aggregates 里，CLI orphan 阶段会整文件删除——丢失
  * 用户手写配置。故对 dropped 厂商也 emit（entries 空、ownedKeys=该厂商受管∪移除的
  * key/name），让 CLI mergeAggregate 清 owned、留 foreign。
  *
- * - managed = 当前受管（workspace_assets ∪ project_capabilities）的 mcp/hook；
+ * - managed = 当前受管（capability_set_assets ∪ project_capabilities）的 mcp/hook；
  *   removed = 上次账本中已移除的 mcp/hook。两者并集决定 ownedKeys。
  * - effective 厂商：entries = enabled 渲染（+path 鉴权注入）；contributingAssetIds = enabled。
  * - dropped 厂商：entries = []（不写任何条目，仅按 ownedKeys 清旧 owned）。

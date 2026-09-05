@@ -8,8 +8,8 @@ import ToolIcon from "../components/ToolIcon.js";
 
 const CONCEPTS = [
   { term: "能力（Asset）", desc: "最小可复用单元，分 Skill / Rule / MCP / Hook / Command / Agent 六类，每个能力包含若干文件和元信息。" },
-  { term: "工作空间（Workspace）", desc: "多个能力的组合，是安装的单位。一个项目可同时安装多个工作空间，能力叠加生效。" },
-  { term: "订阅（Subscription）", desc: "项目与工作空间之间的安装关系，每条订阅携带独立的同步策略（auto / locked）与目标工具。" },
+  { term: "能力集（CapabilitySet）", desc: "多个能力的组合，是安装的单位。一个项目可同时安装多个能力集，能力叠加生效。" },
+  { term: "订阅（Subscription）", desc: "项目与能力集之间的安装关系，每条订阅携带独立的同步策略（auto / locked）与目标工具。" },
   { term: "项目（Project）", desc: "通过 loom register 注册的本地项目目录。Agent 只能操作已注册项目，不会扫描你的整台电脑。" },
   { term: "设备（Device）", desc: "运行 loom start 的本机。Web 通过 WebSocket 与设备上的 Agent 通信。" },
   { term: "本地控制台", desc: "/console 页面，展示 Agent 扫描后的真实磁盘镜像：Loom 管理文件、外部文件、缺失文件，支持按订阅安装 / 卸载与单能力开关。" },
@@ -235,7 +235,7 @@ const CLI_COMMANDS = [
   { cmd: "loom status", desc: "查看连接、设备、项目状态（离线可用，--json 便于脚本化）" },
   { cmd: "loom register", desc: "注册当前项目目录" },
   { cmd: "loom unregister", desc: "注销当前项目目录" },
-  { cmd: "loom push", desc: "把本地厂商目录内容推送到平台，创建或覆盖一个工作空间" },
+  { cmd: "loom push", desc: "把本地厂商目录内容推送到平台，创建或覆盖一个能力集" },
   { cmd: "loom version", desc: "查看当前 CLI 版本" },
   { cmd: "loom update", desc: "更新 CLI 到最新版本" },
 ];
@@ -246,7 +246,7 @@ const SECTIONS = [
   { id: "quick-start", label: "快速开始" },
   { id: "concepts", label: "核心概念" },
   { id: "cli-commands", label: "CLI 命令" },
-  { id: "subscriptions", label: "工作空间与订阅" },
+  { id: "subscriptions", label: "能力集与订阅" },
   { id: "sync-flow", label: "本地怎么同步" },
   { id: "asset-types", label: "能力类型" },
   { id: "sources", label: "能力来源" },
@@ -348,7 +348,7 @@ export default function DocsPage() {
           register={(el) => (sectionsRef.current["quick-start"] = el)}
         >
           <p className="text-sm text-text-secondary mb-4">
-            完成下面 4 步即可把本地项目接入 Loom，安装来自能力市场的 Workspace。
+            完成下面 4 步即可把本地项目接入 Loom，安装来自能力市场的 CapabilitySet。
           </p>
           <ol className="space-y-3">
             {connectSteps.map(({ step, label, cmd }) => (
@@ -418,26 +418,26 @@ export default function DocsPage() {
 
         <Section
           id="subscriptions"
-          title="工作空间与订阅"
+          title="能力集与订阅"
           register={(el) => (sectionsRef.current["subscriptions"] = el)}
         >
           <p className="text-sm text-text-secondary leading-relaxed mb-4">
-            安装一个工作空间，本质是在项目和它之间建立一条「订阅」。一个项目可以同时拥有多条订阅，
+            安装一个能力集，本质是在项目和它之间建立一条「订阅」。一个项目可以同时拥有多条订阅，
             能力取并集叠加生效；每条订阅的同步策略和目标工具独立可调。
           </p>
           <div className="grid gap-3 md:grid-cols-2">
             <FlowCard
-              title="多空间叠加"
+              title="多能力集叠加"
               items={[
-                "一个项目可同时安装多个工作空间，本地控制台为每条订阅展示一张卡片。",
-                "同一能力被多个空间引用时共享单例，按 (能力 × 厂商) 引用计数。",
+                "一个项目可同时安装多个能力集，本地控制台为每条订阅展示一张卡片。",
+                "同一能力被多个能力集引用时共享单例，按 (能力 × 厂商) 引用计数。",
                 "卸载某条订阅时，只有不再被任何订阅引用的能力才会撤掉文件。",
               ]}
             />
             <FlowCard
               title="逐订阅同步策略"
               items={[
-                "auto：能力内容或空间成员变化后，自动推送到在线项目。",
+                "auto：能力内容或能力集成员变化后，自动推送到在线项目。",
                 "locked：保持本地文件不变，直到手动重装或切回 auto。",
                 "策略挂在订阅上，切换某一条不影响项目的其它订阅。",
               ]}
@@ -453,7 +453,7 @@ export default function DocsPage() {
             <FlowCard
               title="单独添加的能力"
               items={[
-                "不必为了装一个能力而创建工作空间：可直接把单项能力添加到项目。",
+                "不必为了装一个能力而创建能力集：可直接把单项能力添加到项目。",
                 "它在控制台呈现为「单独添加的能力」分组，同步策略独立可调。",
                 "目标工具跟随项目的有效厂商集合。",
               ]}
@@ -467,7 +467,7 @@ export default function DocsPage() {
           register={(el) => (sectionsRef.current["sync-flow"] = el)}
         >
           <p className="text-sm text-text-secondary leading-relaxed mb-4">
-            你可以把 Loom 理解成「平台保存清单，本机保存文件」。平台里的能力和工作空间只是清单；
+            你可以把 Loom 理解成「平台保存清单，本机保存文件」。平台里的能力和能力集只是清单；
             真正给 Cursor、CodeBuddy、Codex、Claude Code 使用的文件，仍然写在你的项目目录里。
           </p>
 
@@ -475,7 +475,7 @@ export default function DocsPage() {
             <SimpleStep
               step="1"
               title="平台保存清单"
-              text="能力是具体内容，工作空间是一组能力。你在网页上创建、编辑、组合它们。"
+              text="能力是具体内容，能力集是一组能力。你在网页上创建、编辑、组合它们。"
             />
             <SimpleStep
               step="2"
@@ -511,11 +511,11 @@ export default function DocsPage() {
               ]}
             />
             <FlowCard
-              title="我改了一个工作空间，会发生什么？"
+              title="我改了一个能力集，会发生什么？"
               items={[
-                "工作空间可以理解成一套能力清单。",
-                "你给工作空间加了能力：自动同步的订阅会补上新增文件。",
-                "你从工作空间移除了能力：自动同步的订阅会移除 Loom 之前写入的对应文件。",
+                "能力集可以理解成一套能力清单。",
+                "你给能力集加了能力：自动同步的订阅会补上新增文件。",
+                "你从能力集移除了能力：自动同步的订阅会移除 Loom 之前写入的对应文件。",
                 "如果本机不在线，网页会先显示最后一次看到的状态。",
               ]}
             />
@@ -523,7 +523,7 @@ export default function DocsPage() {
               title="本地控制台能做什么？"
               items={[
                 "点「刷新本地」：让本机重新检查一次项目目录。",
-                "点「+ 添加空间」：给项目再装一套工作空间，能力叠加生效。",
+                "点「+ 添加能力集」：给项目再装一套能力集，能力叠加生效。",
                 "卸载某条订阅：只撤掉不再被其它订阅引用的能力文件。",
                 "点「添加能力」：只给当前项目补装一个或几个能力。",
                 "关闭某个能力：先临时移走它的文件；重新开启时再恢复。",
@@ -609,7 +609,7 @@ export default function DocsPage() {
               title="Marketplace：Git 来源导入（管理员）"
               items={[
                 "在「设置 → 数据来源」添加 Git 仓库地址，支持 claude-code-marketplace、claude-code-plugin、generic-git 三种来源类型。",
-                "服务端定期 clone / fetch，解析其中的能力和 plugin 工作空间并自动更新到平台。",
+                "服务端定期 clone / fetch，解析其中的能力和 plugin 能力集并自动更新到平台。",
                 "每次同步记录日志（新增 / 更新 / 移除 / 耗时 / 错误），轮询间隔可在设置页调整。",
                 "安全边界：远程地址仅接受不含凭据的 HTTPS，且域名必须只解析到公网地址。",
               ]}
@@ -617,10 +617,10 @@ export default function DocsPage() {
             <FlowCard
               title="loom push：本地反哺平台"
               items={[
-                "把本地 .cursor / .codebuddy / .codex / .claude 目录的内容推送为一个工作空间。",
+                "把本地 .cursor / .codebuddy / .codex / .claude 目录的内容推送为一个能力集。",
                 "默认命名为 用户名/项目目录名，可用 --name 自定义，--visibility 控制可见性（默认 private）。",
                 "多厂商目录存在时交互选择，也可用 --tool 直接指定。",
-                "同名工作空间再次 push 即覆盖成员；来自 Marketplace 的同名空间会被拒绝，防止误伤导入内容。",
+                "同名能力集再次 push 即覆盖成员；来自 Marketplace 的同名能力集会被拒绝，防止误伤导入内容。",
               ]}
             />
           </div>

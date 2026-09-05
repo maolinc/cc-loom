@@ -11,7 +11,7 @@
  *  - SHA 不变再 refresh：计数全 0（force 重解析，内容未变）。
  *  - 内容变更后 refresh：updated>0。
  *  - 源中文件消失后 refresh：removed>0 + asset 从库消失。
- *  - 消失但被工作空间引用的 asset → 留存（库 404，空间 retained）。
+ *  - 消失但被能力集引用的 asset → 留存（库 404，能力集 retained）。
  *  - clone/fetch 失败 → sync log 记 failed（经 admin sync→tick，无 withRetry，快速）。
  *  - rule/mcp/hook metadata 导入正确（skill metadata 空）。
  *  - mcp 源文件变更后 refresh → metadata 更新。
@@ -125,20 +125,20 @@ describe("L3 marketplace runImport 不变量", () => {
     expect((await api.listAssets()).length).toBe(before - log.removed);
   });
 
-  it("消失但被工作空间引用的 asset → 留存（库 404，空间 retained）", async () => {
+  it("消失但被能力集引用的 asset → 留存（库 404，能力集 retained）", async () => {
     await boot();
     const id = (await adminApi.addMarketplace(fx!.url)).id;
     const assets = await api.listAssets();
     const skill = assets.find((a) => a.sourcePath === "skills/coding-style")!;
     expect(skill).toBeDefined();
 
-    // 把该 asset 钉到一个用户工作空间
-    const ws = await api.createWorkspace(
+    // 把该 asset 钉到一个用户能力集
+    const ws = await api.createCapabilitySet(
       { name: "pin-ws", description: "x", targetTools: ["cursor"], visibility: "private" },
       [skill.id],
     );
 
-    // 删掉源文件并提交 → 该 asset 从源消失但被空间引用 → 留存
+    // 删掉源文件并提交 → 该 asset 从源消失但被能力集引用 → 留存
     const { rmSync } = await import("node:fs");
     rmSync(join(fx!.path, "skills/coding-style.md"), { force: true });
     fx!.commit();
@@ -146,8 +146,8 @@ describe("L3 marketplace runImport 不变量", () => {
 
     // 库视角：asset 软删 → 404
     await expect(api.getAsset(skill.id)).rejects.toMatchObject({ status: 404 });
-    // 空间视角：仍保留该成员，标 retained
-    const wd = await api.getWorkspace(ws.id);
+    // 能力集视角：仍保留该成员，标 retained
+    const wd = await api.getCapabilitySet(ws.id);
     const member = wd.assets.find((a: any) => a.id === skill.id);
     expect(member).toBeDefined();
     expect((member as any).retained).toBe(true);
@@ -226,7 +226,7 @@ describe("L3 marketplace runImport 不变量", () => {
     expect(tools.length).toBeGreaterThan(0);
     const tool = tools[0]!;
 
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "auto-ws", description: "x", targetTools: [tool], visibility: "public" },
       [skillAsset.id],
     );
@@ -237,7 +237,7 @@ describe("L3 marketplace runImport 不变量", () => {
       isOnline: async () => (await api.listDevices()).some((d) => d.status === "online"),
     });
     await api.installExecute({
-      projectId: agent.projectId, workspaceId: ws.id, targetTools: [tool], policy: "auto",
+      projectId: agent.projectId, capabilitySetId: ws.id, targetTools: [tool], policy: "auto",
     });
 
     // 找到落盘的 SKILL.md

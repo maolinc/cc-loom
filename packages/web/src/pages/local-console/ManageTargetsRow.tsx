@@ -1,16 +1,16 @@
 /**
- * ManageTargetsRow —— 已安装工作空间下的「厂商管理」行。
+ * ManageTargetsRow —— 已安装能力集下的「厂商管理」行。
  *
  * 安装后用户可在此新增 / 移除落盘厂商：点击某厂商即把它加入或移出目标集合，
  * server 端重新 reconcile，新增厂商会创建对应 vendor 目录并写入能力，移除则
  * 按 (能力 × 厂商) 引用计数清理其文件。
  *
  * 约束：
- *  - 仅展示可选范围内的厂商（workspaceTargets）。
+ *  - 仅展示可选范围内的厂商（capabilitySetTargets）。
  *  - 至少保留一个启用厂商（与后端校验一致）。
  *
  * ADR-0006：目标厂商挂在订阅上。显式订阅卡传
- * endpoint=`/projects/:id/subscriptions/:wid/targets`；隐式订阅（「单独添加的
+ * endpoint=`/projects/:id/subscriptions/:capabilitySetId/targets`；隐式订阅（「单独添加的
  * 能力」组）与「添加能力」场景走项目级 `/projects/:id/targets`（默认）。
  */
 import { useState } from "react";
@@ -23,8 +23,8 @@ import ToolIcon from "../../components/ToolIcon.js";
 
 interface Props {
   projectId: string;
-  /** 可选的全部厂商（工作空间声明范围 / 项目有效工具集合）。 */
-  workspaceTargets: TargetTool[];
+  /** 可选的全部厂商（能力集声明范围 / 项目有效工具集合）。 */
+  capabilitySetTargets: TargetTool[];
   /** 当前已启用（落盘）的厂商集合。 */
   activeTargets: TargetTool[];
   /** 变更成功后回调，父组件据此刷新项目列表 + 本地镜像。 */
@@ -37,7 +37,7 @@ interface Props {
 
 export default function ManageTargetsRow({
   projectId,
-  workspaceTargets,
+  capabilitySetTargets,
   activeTargets,
   onChanged,
   disabled,
@@ -46,11 +46,11 @@ export default function ManageTargetsRow({
   const toast = useToast();
   const [pending, setPending] = useState<TargetTool | null>(null);
 
-  const tools = sortTargetTools(workspaceTargets);
+  const tools = sortTargetTools(capabilitySetTargets);
   if (tools.length === 0) return null;
 
-  // 当前启用集合（约束在工作空间声明范围内，避免历史脏数据）。
-  const active = new Set(activeTargets.filter((t) => workspaceTargets.includes(t)));
+  // 当前启用集合（约束在能力集声明范围内，避免历史脏数据）。
+  const active = new Set(activeTargets.filter((t) => capabilitySetTargets.includes(t)));
 
   const apply = async (tool: TargetTool, next: boolean) => {
     if (disabled || pending) return;

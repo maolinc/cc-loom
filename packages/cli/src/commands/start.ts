@@ -581,7 +581,7 @@ function wireProjectMirror(client: AgentClient, log: MirrorLog): MirrorWiring {
           }
           const result: InstallResult = {
             success: errors.length === 0,
-            workspaceId: lock?.subscriptions?.find((s) => s.workspaceId)?.workspaceId ?? lock?.workspaceId ?? "",
+            capabilitySetId: lock?.subscriptions?.find((s) => s.capabilitySetId)?.capabilitySetId ?? "",
             projectId,
             completedAt: new Date().toISOString(),
             filesWritten: filesRemoved, // 复用字段：表示本次操作触达的文件清单
@@ -662,7 +662,7 @@ function wireProjectMirror(client: AgentClient, log: MirrorLog): MirrorWiring {
     if (!p) return respondError(`本机未找到项目 ${projectId}`);
     try {
       // AgentRequest 把 op 之外的字段平铺，符合 WsReconcileRequest 字段（projectId /
-      // workspaceId / syncPolicy / targetTools / plan）—— 直接断言可用。
+      // capabilitySetId / syncPolicy / targetTools / plan）—— 直接断言可用。
       const rc = req as unknown as WsReconcileRequest & { requestId: string; op: string };
       const { response, errors } = applyReconcilePlan(rc, p.normalizedPath);
       client.sendResponse({ requestId: req.requestId, success: true, data: response });

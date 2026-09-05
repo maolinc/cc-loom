@@ -10,7 +10,7 @@
  *    其他文件。
  *  - 不读 file content；`size` 用 `fs.statSync(...).size` 取，足以让 UI 展示。
  *  - **drift 自动修复**：当 lock 存在且 lockedFiles 全部不在磁盘（0/N）→ 删除
- *    lock 并标 `driftCleared=true`、`installedWorkspaceId=null`；部分缺失（k/N，
+ *    lock 并标 `driftCleared=true`、`installedCapabilitySetIds=[]`；部分缺失（k/N，
  *    0<k<N）只在 `missingCount` 计数体现，不动 lock。
  *
  * Capabilities 注入（per-asset lock 路径下）：
@@ -325,11 +325,11 @@ export function scanProjectState(project: LocalProjectRecord): LocalProjectState
   //    否则「把能力全部关闭」时，disabled 文件被有意移入隔离区、磁盘上本就不该有，
   //    会被误判成 drift 而删掉整个 lock —— 导致禁用状态丢失、能力从镜像消失 / 开关回弹。
   //    全 disabled（enabledExpected.size===0）不是 drift：lock 需保留以维持关闭态。
-  let installedWorkspaceIds: string[] = lockSubscriptionIds(lock);
+  let installedCapabilitySetIds: string[] = lockSubscriptionIds(lock);
   let driftCleared = false;
   if (lock && enabledExpected.size > 0 && totalManagedHits.size === 0) {
     removeLock(project.id);
-    installedWorkspaceIds = [];
+    installedCapabilitySetIds = [];
     driftCleared = true;
   }
 
@@ -379,22 +379,22 @@ export function scanProjectState(project: LocalProjectRecord): LocalProjectState
     projectId: project.id,
     scannedAt: new Date().toISOString(),
     vendors,
-    installedWorkspaceIds,
+    installedCapabilitySetIds,
     driftCleared,
     ...(capabilities !== undefined ? { capabilities } : {}),
     ...(legacy ? { legacyLock: true } : {}),
   };
 }
 
-/** lock → 显式订阅的 workspaceId 列表（兼容 v2/v1 lock 的单值 workspaceId 字段）。 */
+/** lock → 显式订阅的 capabilitySetId 列表；readLock 已归一化旧格式。 */
 function lockSubscriptionIds(lock: LockFile | null): string[] {
   if (!lock) return [];
   if (Array.isArray(lock.subscriptions)) {
     return lock.subscriptions
-      .map((s) => s.workspaceId)
+      .map((s) => s.capabilitySetId)
       .filter((id): id is string => typeof id === "string" && id.length > 0);
   }
-  return lock.workspaceId ? [lock.workspaceId] : [];
+  return [];
 }
 
 // ---------------------------- hook 事件扫描（聚合注册表） ----------------------------

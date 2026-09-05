@@ -44,8 +44,8 @@ interface Props {
   assetTypes?: Map<string, AssetType>;
   /** assetId → 别名：左侧树/目录列表中名称后以灰色辅助展示。 */
   assetAliases?: Map<string, string>;
-  /** 当前已安装 workspace 的 asset 列表（用于"查看 Asset"链接） */
-  workspaceAssets?: { id: string; name: string }[];
+  /** 当前已安装 capabilitySet 的 asset 列表（用于"查看 Asset"链接） */
+  capabilitySetAssets?: { id: string; name: string }[];
   /** 用户点"查看 Asset →"时由父组件接管 */
   onOpenAsset?: (assetId: string) => void;
   /** 用户在左侧树或目录预览中点击子项时回调 */
@@ -80,7 +80,7 @@ export default function PreviewPanel({
   vendorTool,
   assetTypes,
   assetAliases,
-  workspaceAssets,
+  capabilitySetAssets,
   onOpenAsset,
   onNavigate,
   onToggleCapability,
@@ -186,7 +186,7 @@ export default function PreviewPanel({
                 projectId={projectId}
                 path={target.path}
                 managed={target.managed}
-                workspaceAssets={workspaceAssets}
+                capabilitySetAssets={capabilitySetAssets}
                 assetTypes={assetTypes}
                 onOpenAsset={onOpenAsset}
               />
@@ -230,14 +230,14 @@ function FileBody({
   projectId,
   path,
   managed,
-  workspaceAssets,
+  capabilitySetAssets,
   assetTypes,
   onOpenAsset,
 }: {
   projectId: string;
   path: string;
   managed: boolean;
-  workspaceAssets?: { id: string; name: string }[];
+  capabilitySetAssets?: { id: string; name: string }[];
   assetTypes?: Map<string, AssetType>;
   onOpenAsset?: (assetId: string) => void;
 }) {
@@ -276,10 +276,10 @@ function FileBody({
   // 反查所属 Asset（用于 chip 类型 + 「查看 Asset」按钮）
   let assetLink: { id: string; name: string } | null = null;
   let assetType: AssetType | undefined;
-  if (managed && !isMcp && workspaceAssets && workspaceAssets.length > 0) {
+  if (managed && !isMcp && capabilitySetAssets && capabilitySetAssets.length > 0) {
     const name = assetNameFromPath(path);
     if (name) {
-      const hit = workspaceAssets.find((a) => a.name === name);
+      const hit = capabilitySetAssets.find((a) => a.name === name);
       if (hit) {
         assetLink = hit;
         assetType = assetTypes?.get(hit.id);

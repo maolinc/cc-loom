@@ -113,12 +113,12 @@ describe("L3 view-consistency: 能力视图与厂商视图同源", () => {
     const { projectId } = await setup();
     const a = await api.createAsset(wrappedMcpAsset("mcp_a", "svc_a", TOOLS));
     const b = await api.createAsset(wrappedMcpAsset("mcp_b", "svc_b", TOOLS));
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "ws", description: "ws", targetTools: TOOLS, visibility: "public" },
       [a.id, b.id],
     );
     const { result } = await api.installExecute({
-      projectId, workspaceId: ws.id, targetTools: TOOLS, policy: "auto",
+      projectId, capabilitySetId: ws.id, targetTools: TOOLS, policy: "auto",
     });
     expect(result.success).toBe(true);
 
@@ -157,12 +157,12 @@ describe("L3 view-consistency: 能力视图与厂商视图同源", () => {
     );
     // 安装一个受管 wrapped MCP（server key svc_a）
     const a = await api.createAsset(wrappedMcpAsset("mcp_a", "svc_a", ["claudecode"]));
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "ws", description: "ws", targetTools: ["claudecode"], visibility: "public" },
       [a.id],
     );
     await api.installExecute({
-      projectId, workspaceId: ws.id, targetTools: ["claudecode"], policy: "auto",
+      projectId, capabilitySetId: ws.id, targetTools: ["claudecode"], policy: "auto",
     });
 
     // 安装后：受管 mcp_a + 外部 pencil 共存于同一 .mcp.json
@@ -202,12 +202,12 @@ describe("L3 view-consistency: 能力视图与厂商视图同源", () => {
   it("disabled MCP：能力行开关 = 磁盘真实状态；re-enable 后两视图同步恢复", async () => {
     const { projectId } = await setup();
     const a = await api.createAsset(wrappedMcpAsset("mcp_a", "svc_a", ["claudecode"]));
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "ws", description: "ws", targetTools: ["claudecode"], visibility: "public" },
       [a.id],
     );
     await api.installExecute({
-      projectId, workspaceId: ws.id, targetTools: ["claudecode"], policy: "auto",
+      projectId, capabilitySetId: ws.id, targetTools: ["claudecode"], policy: "auto",
     });
 
     // 初始：受管 enabled

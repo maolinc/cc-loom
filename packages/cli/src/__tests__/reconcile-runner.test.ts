@@ -10,7 +10,7 @@
  *   6. removed assets：plan.removed 含某 id → 该 id 在隔离区的旧副本被清
  *   7. aggregates 写入 / 清空：mcp.json content / mcp.json content=null → 删除
  *   8. v1 lock 迁移：lockFormat 缺失 + vendors[t].enabled=false 集合 → migrationDisabled
- *   9. 空 plan + workspaceId=null：vendor & 隔离区 & aggregate 全清
+ *   9. 空 plan + capabilitySetId=null：vendor & 隔离区 & aggregate 全清
  *  10. 路径安全：plan 携带越界 path 被 errors 捕获，不写盘也不致命
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -30,7 +30,7 @@ function makeReq(plan: ReconcilePlan, opts: Partial<WsReconcileRequest> = {}): W
     requestId: "req-1",
     projectId: PROJECT_ID,
     // 显式区分"未传"和"传空数组"：`??` 把 undefined 当默认值。
-    subscriptions: opts.subscriptions ?? [{ workspaceId: "ws-rec", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
+    subscriptions: opts.subscriptions ?? [{ capabilitySetId: "ws-rec", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
     targetTools: opts.targetTools ?? ["cursor"],
     plan,
   };
@@ -83,7 +83,7 @@ describe("applyReconcilePlan", () => {
     expect(response.migrationDisabled).toBeUndefined();
     const lock = readLock(PROJECT_ID)!;
     expect(lock.lockFormat).toBe("3");
-    expect(lock.subscriptions.map((s) => s.workspaceId)).toEqual(["ws-rec"]);
+    expect(lock.subscriptions.map((s) => s.capabilitySetId)).toEqual(["ws-rec"]);
     expect(lock.assets["a1"]!.vendors!.cursor!.enabled).toBe(true);
     expect(lock.assets["a1"]!.vendors!.cursor!.files).toEqual([".cursor/skills/a1.md"]);
   });
@@ -269,7 +269,7 @@ describe("applyReconcilePlan", () => {
     writeFileSync(join(projectRoot, cursorSkill), "legacy");
     // 写一个 v1 per-asset lock（无 lockFormat），其中 cursor vendor 被关闭
     const v1lock: LockFile = {
-      subscriptions: [{ workspaceId: "ws-rec", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }], version: "1",
+      subscriptions: [{ capabilitySetId: "ws-rec", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }], version: "1",
       assets: {
         legacyAsset: {
           version: "1", name: "legacy", type: "skill",
@@ -295,7 +295,7 @@ describe("applyReconcilePlan", () => {
 
   it("legacy lock (__plan__): 不产 migrationDisabled", () => {
     writeLock(PROJECT_ID, {
-      subscriptions: [{ workspaceId: "ws-rec", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }], version: "1",
+      subscriptions: [{ capabilitySetId: "ws-rec", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }], version: "1",
       assets: { __plan__: { version: "1", files: [".cursor/skills/x.md"] } },
     });
     const req = makeReq({ enabled: [], disabled: [], removed: [], aggregates: [] });

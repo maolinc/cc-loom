@@ -1,11 +1,11 @@
 /**
- * 本地控制台 — 多空间订阅版（ADR-0006）。
+ * 本地控制台 — 多能力集订阅版（ADR-0006）。
  *
  * 信息架构：
  *  - 顶部：driftCleared banner（若触发）
  *  - 左：项目列表（5s 轮询）
  *  - 右上：项目 header（名称 + 状态 + 路径复制 + 添加能力 + 重新扫描 + ⋯）
- *  - 右中：订阅条（每空间一卡 + 隐式订阅简卡 + 添加空间）
+ *  - 右中：订阅条（每个能力集一卡 + 隐式订阅简卡 + 添加能力集）
  *  - 右下：本地镜像 — 视图切换（按厂商横 tab / 按能力矩阵）
  *
  * 反馈：toast 队列；卸载与移除能力均走 ConfirmDialog（替换原生 confirm）。
@@ -46,7 +46,7 @@ import CapabilityMatrix from "./local-console/CapabilityMatrix.js";
 import PreviewPanel, { type PreviewTarget } from "./local-console/PreviewPanel.js";
 import ProjectSyncCard from "./local-console/ProjectSyncCard.js";
 import AddCapabilityDialog from "./local-console/AddCapabilityDialog.js";
-import SubscriptionStrip, { type SubscriptionWorkspaceMeta } from "./local-console/SubscriptionStrip.js";
+import SubscriptionStrip, { type SubscriptionCapabilitySetMeta } from "./local-console/SubscriptionStrip.js";
 import { ActiveContext } from "../components/KeepAlive.js";
 
 const PROJECT_POLL_MS = 30_000;
@@ -107,9 +107,9 @@ export default function LocalConsolePage() {
   const [viewMode, setViewMode] = useState<ViewMode>("vendor");
   const [activeTab, setActiveTab] = useState<TargetTool | null>(null);
 
-  // 工作空间相关
+  // 能力集相关
   const [openAssetId, setOpenAssetId] = useState<string | null>(null);
-  const [openWorkspaceId, setOpenWorkspaceId] = useState<string | null>(null);
+  const [openCapabilitySetId, setOpenCapabilitySetId] = useState<string | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [capabilityBusy, setCapabilityBusy] = useState(false);
@@ -119,7 +119,7 @@ export default function LocalConsolePage() {
   // 避免「连续 toggle 时开关被旧真值刷回、来回跳」。scan 真值与意图一致后清除。
   const pendingTogglesRef = useRef<Map<string, boolean>>(new Map());
 
-  // 卸载工作空间 dialog
+  // 卸载能力集 dialog
   const [uninstallOpen, setUninstallOpen] = useState(false);
   const [uninstalling, setUninstalling] = useState(false);
 
@@ -131,15 +131,15 @@ export default function LocalConsolePage() {
   const [purgeProjectId, setPurgeProjectId] = useState<string | null>(null);
   const [purging, setPurging] = useState(false);
 
-  // 各订阅 workspace 的 asset 列表（id + name + type，跨空间合并），用于：
+  // 各订阅能力集的 asset 列表（id + name + type，跨能力集合并），用于：
   //  - PreviewPanel "查看 Asset" 链接匹配
   //  - MirrorTreeView assetTypes 映射（渲染 chip）
   //  - 能力矩阵的别名 / 描述映射
-  const [workspaceAssets, setWorkspaceAssets] = useState<
+  const [capabilitySetAssets, setCapabilitySetAssets] = useState<
     { id: string; name: string; type: AssetType; alias?: string | null; description?: string }[] | undefined
   >(undefined);
-  // workspaceId → 订阅卡补充信息（描述 / 声明厂商）；retained 空间拉不到详情时缺省。
-  const [workspaceMeta, setWorkspaceMeta] = useState<Map<string, SubscriptionWorkspaceMeta>>(new Map());
+  // capabilitySetId → 订阅卡补充信息（描述 / 声明厂商）；retained 能力集拉不到详情时缺省。
+  const [capabilitySetMeta, setCapabilitySetMeta] = useState<Map<string, SubscriptionCapabilitySetMeta>>(new Map());
 
   const selectedRef = useRef<string | null>(null);
   selectedRef.current = selectedProjectId;
@@ -313,7 +313,7 @@ export default function LocalConsolePage() {
           const msg = JSON.parse(ev.data);
           if (msg.type === "web:project:state_changed") {
             const pid = msg.payload?.projectId;
-            // 刷新选中项目 state + 刷新项目列表（可能状态/workspace变化）
+            // 刷新选中项目 state + 刷新项目列表（可能状态/capabilitySet变化）
             if (pid && pid === selectedRef.current) fetchState(pid);
             fetchProjectsRef.current();
           } else if (msg.type === "project:registered") {
@@ -338,40 +338,40 @@ export default function LocalConsolePage() {
     };
   }, [isActive]);
 
-  // ---- 拉各订阅 workspace 的 asset 列表 + 订阅卡补充信息 --------------------
+  // ---- 拉各订阅 capabilitySet 的 asset 列表 + 订阅卡补充信息 --------------------
   const project = projects.find((p) => p.id === selectedProjectId);
-  const explicitWorkspaceIds = useMemo(
+  const explicitCapabilitySetIds = useMemo(
     () =>
       (project?.subscriptions ?? [])
-        .map((s) => s.workspaceId)
-        .filter((wid): wid is string => wid !== null)
+        .map((s) => s.capabilitySetId)
+        .filter((capabilitySetId): capabilitySetId is string => capabilitySetId !== null)
         .sort(),
     [project?.subscriptions],
   );
-  const explicitWorkspaceKey = explicitWorkspaceIds.join(",");
+  const explicitCapabilitySetKey = explicitCapabilitySetIds.join(",");
   useEffect(() => {
-    const wids = explicitWorkspaceKey ? explicitWorkspaceKey.split(",") : [];
-    if (wids.length === 0) {
-      setWorkspaceAssets(undefined);
-      setWorkspaceMeta(new Map());
+    const capabilitySetIds = explicitCapabilitySetKey ? explicitCapabilitySetKey.split(",") : [];
+    if (capabilitySetIds.length === 0) {
+      setCapabilitySetAssets(undefined);
+      setCapabilitySetMeta(new Map());
       return;
     }
     let alive = true;
     Promise.all(
-      wids.map((wid) =>
+      capabilitySetIds.map((capabilitySetId) =>
         api.get<{ assets?: Array<any>; description?: string; targetTools?: TargetTool[] }>(
-          `/workspaces/${wid}`,
+          `/capability-sets/${capabilitySetId}`,
         ),
       ),
     ).then((results) => {
       if (!alive) return;
       const list: { id: string; name: string; type: AssetType; alias?: string | null; description?: string }[] = [];
       const seen = new Set<string>();
-      const meta = new Map<string, SubscriptionWorkspaceMeta>();
-      for (let i = 0; i < wids.length; i++) {
+      const meta = new Map<string, SubscriptionCapabilitySetMeta>();
+      for (let i = 0; i < capabilitySetIds.length; i++) {
         const res = results[i]!;
-        if (!res.success || !res.data) continue; // retained 空间详情拉不到，跳过
-        meta.set(wids[i]!, {
+        if (!res.success || !res.data) continue; // retained 能力集详情拉不到，跳过
+        meta.set(capabilitySetIds[i]!, {
           description: res.data.description ?? "",
           targetTools: res.data.targetTools ?? [],
         });
@@ -383,45 +383,45 @@ export default function LocalConsolePage() {
           }
         }
       }
-      setWorkspaceAssets(list);
-      setWorkspaceMeta(meta);
+      setCapabilitySetAssets(list);
+      setCapabilitySetMeta(meta);
     });
     return () => {
       alive = false;
     };
-  }, [explicitWorkspaceKey]);
+  }, [explicitCapabilitySetKey]);
 
   // assetId → AssetType 映射
   const assetTypes = useMemo(() => {
     const m = new Map<string, AssetType>();
-    for (const a of workspaceAssets ?? []) m.set(a.id, a.type);
+    for (const a of capabilitySetAssets ?? []) m.set(a.id, a.type);
     return m;
-  }, [workspaceAssets]);
+  }, [capabilitySetAssets]);
 
   // assetId → 别名 / 描述 映射：用于在本地控制台各视图以「名称为主、别名灰色」展示，
   // 描述用于 hover 提示（均取自创建能力时的 Asset 记录）。
   const assetAliases = useMemo(() => {
     const m = new Map<string, string>();
-    for (const a of workspaceAssets ?? []) {
+    for (const a of capabilitySetAssets ?? []) {
       const alias = a.alias?.trim();
       if (alias) m.set(a.id, alias);
     }
     return m;
-  }, [workspaceAssets]);
+  }, [capabilitySetAssets]);
   const assetDescriptions = useMemo(() => {
     const m = new Map<string, string>();
-    for (const a of workspaceAssets ?? []) {
+    for (const a of capabilitySetAssets ?? []) {
       if (a.description) m.set(a.id, a.description);
     }
     return m;
-  }, [workspaceAssets]);
+  }, [capabilitySetAssets]);
 
-  // 能力矩阵「来源空间」过滤器选项：项目的订阅集合（显式空间 + 「单独添加」）。
+  // 能力矩阵「来源能力集」过滤器选项：项目的订阅集合（显式能力集 + 「单独添加」）。
   const capabilitySourceOptions = useMemo(
     () =>
       (project?.subscriptions ?? []).map((s) => ({
-        workspaceId: s.workspaceId,
-        name: s.workspaceId === null ? "单独添加" : (s.workspaceName ?? s.workspaceId!),
+        capabilitySetId: s.capabilitySetId,
+        name: s.capabilitySetId === null ? "单独添加" : (s.capabilitySetName ?? s.capabilitySetId!),
       })),
     [project?.subscriptions],
   );
@@ -459,7 +459,7 @@ export default function LocalConsolePage() {
     }
     if (res.data.success) {
       toast.success(
-        "已卸载全部空间",
+        "已卸载全部能力集",
         `共清理 ${res.data.filesWritten.length} 个文件`,
       );
       const list = await api.get<ProjectWithDevice[]>("/projects");
@@ -504,7 +504,7 @@ export default function LocalConsolePage() {
     }
     // 共享能力轻提示：该能力被多个订阅引用，开关对所有来源同时生效（ADR-0006 决策 3）。
     if (cap?.sources && cap.sources.length > 1) {
-      const names = cap.sources.map((s) => (s.workspaceId === null ? "单独添加" : s.name)).join("、");
+      const names = cap.sources.map((s) => (s.capabilitySetId === null ? "单独添加" : s.name)).join("、");
       toast.info("共享能力已更新", `该能力同时被 ${names} 引用，本次${enabled ? "开启" : "关闭"}对所有来源生效`);
     }
     // adopt 后 assetId 变真实 id / 行 id 变化 → WS 推回镜像旧 key 无法对齐，直接 refetch。
@@ -537,7 +537,7 @@ export default function LocalConsolePage() {
       { assetId: reqAssetId, ...(tool ? { tool } : {}), ...(externalAsset ? { externalAsset } : {}) },
     );
     setCapabilityBusy(false);
-    const asset = workspaceAssets?.find((a) => a.id === reqAssetId);
+    const asset = capabilitySetAssets?.find((a) => a.id === reqAssetId);
     const name = asset?.name ?? cap?.name ?? aid;
     if (!res.success || !res.data) {
       toast.error("移除失败", res.error || "未知错误");
@@ -597,8 +597,8 @@ export default function LocalConsolePage() {
     const snapshot = {
       project: { id: project.id, name: project.projectName, path: project.normalizedPath },
       subscriptions: project.subscriptions.map((s) => ({
-        workspaceId: s.workspaceId,
-        workspaceName: s.workspaceName ?? (s.workspaceId === null ? "单独添加" : null),
+        capabilitySetId: s.capabilitySetId,
+        capabilitySetName: s.capabilitySetName ?? (s.capabilitySetId === null ? "单独添加" : null),
         syncPolicy: s.syncPolicy,
         targetTools: s.targetTools,
         installedAt: s.installedAt,
@@ -685,11 +685,11 @@ export default function LocalConsolePage() {
             <ul className="space-y-1.5" role="listbox">
               {orderedProjects.map((p) => {
                 const selected = selectedProjectId === p.id;
-                const subs = p.subscriptions.filter((s) => s.workspaceId !== null);
+                const subs = p.subscriptions.filter((s) => s.capabilitySetId !== null);
                 const subSummary =
                   subs.length > 0
-                    ? `${subs.length} 个空间：${subs.map((s) => s.workspaceName ?? s.workspaceId).join("、")}`
-                    : "未订阅空间";
+                    ? `${subs.length} 个能力集：${subs.map((s) => s.capabilitySetName ?? s.capabilitySetId).join("、")}`
+                    : "未订阅能力集";
                 const isDragging = dragId === p.id;
                 const isOver = !!dragId && dragId !== p.id && overId === p.id;
                 return (
@@ -874,7 +874,7 @@ export default function LocalConsolePage() {
                             }}
                           >
                             <Trash2 size={14} />
-                            卸载全部空间…
+                            卸载全部能力集…
                           </button>
                         </>
                       )}
@@ -890,17 +890,17 @@ export default function LocalConsolePage() {
               </div>
             )}
 
-            {/* ─── 订阅条（每空间一卡 + 隐式订阅简卡 + 添加空间） ─── */}
+            {/* ─── 订阅条（每个能力集一卡 + 隐式订阅简卡 + 添加能力集） ─── */}
             <SubscriptionStrip
               project={project}
-              workspaceMeta={workspaceMeta}
+              capabilitySetMeta={capabilitySetMeta}
               hasStandaloneCapabilities={
-                !!state?.capabilities?.some((c) => (c.sources ?? []).some((src) => src.workspaceId === null))
+                !!state?.capabilities?.some((c) => (c.sources ?? []).some((src) => src.capabilitySetId === null))
               }
               legacyLock={!!state?.legacyLock}
               onChanged={refreshAfterSubscriptionChange}
               onExport={handleExportSnapshot}
-              onOpenWorkspace={(wid) => setOpenWorkspaceId(wid)}
+              onOpenCapabilitySet={(capabilitySetId) => setOpenCapabilitySetId(capabilitySetId)}
             />
 
             {/* ─── 同步队列（项目维度） ─── */}
@@ -967,7 +967,7 @@ export default function LocalConsolePage() {
 
               {state?.legacyLock && (
                 <div className="mb-3 px-3 py-2 rounded-lg bg-amber-50 text-amber-700 text-xs">
-                  该项目当前为旧版安装格式（基于整体 plan 的 lock）。重新安装该空间即可启用「单项能力管理」（开关 / 添加 / 移除）。
+                  该项目当前为旧版安装格式（基于整体 plan 的 lock）。重新安装该能力集即可启用「单项能力管理」（开关 / 添加 / 移除）。
                 </div>
               )}
 
@@ -1034,8 +1034,8 @@ export default function LocalConsolePage() {
                   ) : (
                     <div className="px-4 py-12 text-xs text-text-muted text-center bg-surface-card/50 rounded-2xl">
                       本地未发现任何已创建的厂商目录。
-                      {!project.subscriptions.some((s) => s.workspaceId !== null) &&
-                        " 添加一个空间即可创建对应目录。"}
+                      {!project.subscriptions.some((s) => s.capabilitySetId !== null) &&
+                        " 添加一个能力集即可创建对应目录。"}
                     </div>
                   )}
                 </>
@@ -1061,7 +1061,7 @@ export default function LocalConsolePage() {
                 ) : (
                   <div className="px-4 py-12 text-xs text-text-muted text-center bg-surface-card/50 rounded-2xl">
                     {state?.legacyLock
-                      ? "该项目使用 legacy lock，请重新安装空间以启用矩阵视图"
+                      ? "该项目使用 legacy lock，请重新安装能力集以启用矩阵视图"
                       : "尚未安装任何能力"}
                   </div>
                 )
@@ -1136,7 +1136,7 @@ export default function LocalConsolePage() {
           vendorTool={activeTab ?? undefined}
           assetTypes={assetTypes}
           assetAliases={assetAliases}
-          workspaceAssets={workspaceAssets}
+          capabilitySetAssets={capabilitySetAssets}
           onNavigate={setPreviewTarget}
           onToggleCapability={handleToggleCapability}
           onRemoveCapability={(aid, t) => { setRemoveAssetId(aid); setRemoveTool(t); }}
@@ -1154,32 +1154,32 @@ export default function LocalConsolePage() {
         <DetailPanel type="asset" id={openAssetId} onClose={() => setOpenAssetId(null)} />
       )}
 
-      {/* DetailPanel: 工作空间详情浮层（复用市场/列表的同款面板） */}
-      {openWorkspaceId && (
-        <DetailPanel type="workspace" id={openWorkspaceId} onClose={() => setOpenWorkspaceId(null)} />
+      {/* DetailPanel: 能力集详情浮层（复用市场/列表的同款面板） */}
+      {openCapabilitySetId && (
+        <DetailPanel type="capabilitySet" id={openCapabilitySetId} onClose={() => setOpenCapabilitySetId(null)} />
       )}
 
       {/* 添加能力 */}
       {addDialogOpen && project && (
         <AddCapabilityDialog
           projectId={project.id}
-          alreadyInstalledIds={(workspaceAssets ?? []).map((a) => a.id)}
+          alreadyInstalledIds={(capabilitySetAssets ?? []).map((a) => a.id)}
           title="为项目添加能力"
-          subtitle="从 Asset 库挑选若干能力，作为「单独添加」的能力直接安装（不属于任何空间）。"
+          subtitle="从 Asset 库挑选若干能力，作为「单独添加」的能力直接安装（不属于任何能力集）。"
           onClose={() => setAddDialogOpen(false)}
           onAdded={() => toast.success("已添加能力", "本地镜像将随 agent 推送实时更新")}
         />
       )}
 
-      {/* 卸载全部空间确认 */}
+      {/* 卸载全部能力集确认 */}
       {project && (
         <ConfirmDialog
           open={uninstallOpen}
           kind="danger"
-          title={`卸载「${project.projectName}」的全部空间？`}
+          title={`卸载「${project.projectName}」的全部能力集？`}
           description={
             <>
-              将移除该项目的全部空间订阅与单独添加的能力，从本地{" "}
+              将移除该项目的全部能力集订阅与单独添加的能力，从本地{" "}
               <span className="font-medium text-text-primary">
                 {state ? TARGET_TOOLS.filter((t) => state.vendors[t]?.exists).length : 0}
               </span>{" "}
@@ -1208,7 +1208,7 @@ export default function LocalConsolePage() {
             {(() => {
               const cap = removeAssetId ? resolveCapability(state?.capabilities, removeAssetId) : undefined;
               if (!cap?.sources || cap.sources.length < 2) return null;
-              const names = cap.sources.map((s) => (s.workspaceId === null ? "单独添加" : s.name)).join("、");
+              const names = cap.sources.map((s) => (s.capabilitySetId === null ? "单独添加" : s.name)).join("、");
               return (
                 <span className="block mt-1.5 text-amber-700">
                   注意：该能力同时被 {names} 引用，移除后这些来源都将不再包含它。

@@ -79,7 +79,7 @@ describe("L3 project-purge: 删除项目抹掉全部痕迹", () => {
     const token = await api.getCliToken();
 
     const skill = await api.createAsset(assetBuilders.skill("unreg-skill", ["cursor"]));
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "ws-unreg", description: "unregister test", targetTools: ["cursor"], visibility: "public" },
       [skill.id],
     );
@@ -89,7 +89,7 @@ describe("L3 project-purge: 删除项目抹掉全部痕迹", () => {
     const projectId = agent!.projectId;
 
     await api.installExecute({
-      projectId, workspaceId: ws.id, targetTools: ["cursor"], policy: "locked",
+      projectId, capabilitySetId: ws.id, targetTools: ["cursor"], policy: "locked",
     });
     expectFileExists(projectRoot, ".cursor/skills/unreg-skill/SKILL.md");
     // 确认本地痕迹存在（projects/locks）
@@ -111,7 +111,7 @@ describe("L3 project-purge: 删除项目抹掉全部痕迹", () => {
     const token = await api.getCliToken();
 
     const skill = await api.createAsset(assetBuilders.skill("purge-online-skill", ["cursor"]));
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "ws-purge-online", description: "purge online", targetTools: ["cursor"], visibility: "public" },
       [skill.id],
     );
@@ -121,7 +121,7 @@ describe("L3 project-purge: 删除项目抹掉全部痕迹", () => {
     const projectId = agent!.projectId;
 
     await api.installExecute({
-      projectId, workspaceId: ws.id, targetTools: ["cursor"], policy: "locked",
+      projectId, capabilitySetId: ws.id, targetTools: ["cursor"], policy: "locked",
     });
     expectFileExists(projectRoot, ".cursor/skills/purge-online-skill/SKILL.md");
 
@@ -139,7 +139,7 @@ describe("L3 project-purge: 删除项目抹掉全部痕迹", () => {
     const token = await api.getCliToken();
 
     const skill = await api.createAsset(assetBuilders.skill("purge-offline-skill", ["cursor"]));
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "ws-purge-offline", description: "purge offline", targetTools: ["cursor"], visibility: "public" },
       [skill.id],
     );
@@ -149,7 +149,7 @@ describe("L3 project-purge: 删除项目抹掉全部痕迹", () => {
     const projectId = agent!.projectId;
 
     await api.installExecute({
-      projectId, workspaceId: ws.id, targetTools: ["cursor"], policy: "locked",
+      projectId, capabilitySetId: ws.id, targetTools: ["cursor"], policy: "locked",
     });
     expectFileExists(projectRoot, ".cursor/skills/purge-offline-skill/SKILL.md");
 

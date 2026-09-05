@@ -15,7 +15,7 @@
 | `loom status` | `commands/status.ts` | 查看连接、设备、项目状态，离线可用 |
 | `loom register` | `commands/register.ts` | 注册当前目录为 Loom 项目 |
 | `loom unregister` | `commands/unregister.ts` | 注销当前项目：server 硬删 + 抹掉本机 `~/.loom` 全部痕迹 |
-| `loom push` | `commands/push.ts` | 推送本地厂商目录到平台，创建或覆盖工作空间 |
+| `loom push` | `commands/push.ts` | 推送本地厂商目录到平台，创建或覆盖能力集 |
 | `loom version` | `commands/version.ts` | 打印当前 CLI 版本（与 `--version` 一致，来自 package.json） |
 | `loom update` | `commands/update.ts` | 全局重装 `@maolinc/cc-loom@latest` 自更新，按 npm_config_user_agent 识别包管理器 |
 
@@ -161,7 +161,7 @@ Server 侧 `ws/gateway.ts` 没有导入这些常量，字符串需保持一致�
 - 只扫描 `TARGET_DIRS` 对应目录和 ClaudeCode 根 `.mcp.json`。
 - 不读文件内容，只统计 size（mcp.json 例外：解析 server 名以判定归属）。
 - 依据 lock 标记 managed/external/missing。
-- 如果 lock 存在且所有 expected 文件都不在磁盘，自动删除 lock，`driftCleared=true`，`installedWorkspaceId=null`。
+- 如果 lock 存在且所有 expected 文件都不在磁盘，自动删除 lock，`driftCleared=true`，`installedCapabilitySetIds=[]`。
 - **单一真值源**：先算一次 cell 模型（`buildCells`，per-(能力×厂商) 的 enabled/files/presentCount/assetId/external/mcp-server 归属），`LocalProjectState.capabilities` 与厂商树标注/计数（`managedAssetCount`/`externalCount`）均从它投影。能力视图与厂商视图共用同一份判定，差异只在 UI 分组，避免「两路各算」导致开关/计数/external 分类分叉。
 - mcp server 归属由 `lock.aggregates[tool].serverKeys`（v2）决定；旧 lock 退化为单资产启发式 + 按 asset.name 匹配。
 - 对 mcp.json 会解析 virtual mcp-server 子节点；受管 MCP 能力行的 `files`/`presentCount` 据实补齐（不再恒为空/0）。

@@ -130,7 +130,7 @@ describe("L3 error-path: 认证/校验/404/权限", () => {
     try {
       await api.installPlan({
         projectId: "nonexistent-project-id",
-        workspaceId: "nonexistent-ws-id",
+        capabilitySetId: "nonexistent-ws-id",
         targetTools: ["cursor"],
         policy: "auto",
       });
@@ -158,9 +158,9 @@ describe("L3 error-path: 认证/校验/404/权限", () => {
     expect(assets.find((a) => a.name === "private-skill")).toBeUndefined();
   });
 
-  it("未登录用户看不到私有 workspace", async () => {
+  it("未登录用户看不到私有 capabilitySet", async () => {
     await api.login("priv@example.com");
-    await api.createWorkspace({
+    await api.createCapabilitySet({
       name: "private-ws",
       description: "test",
       targetTools: ["cursor"],
@@ -168,7 +168,7 @@ describe("L3 error-path: 认证/校验/404/权限", () => {
     });
 
     const anonApi = new ApiClient(server.baseUrl);
-    const wss = await anonApi.listWorkspaces();
+    const wss = await anonApi.listCapabilitySets();
     expect(wss.find((w) => w.name === "private-ws")).toBeUndefined();
   });
 });

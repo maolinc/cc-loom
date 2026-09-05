@@ -4,7 +4,7 @@
  * 不变量:
  * - >1MB content 的 asset 能正常创建和安装
  * - 分页 page 超出范围返回空数组（不报错）
- * - 并发创建同名 workspace → 恰好一个成功，另一个 409
+ * - 并发创建同名 capabilitySet → 恰好一个成功，另一个 409
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
@@ -60,7 +60,7 @@ describe("L3 boundary: 大内容 / 分页 / 并发", () => {
     expect(skill.id).toBeDefined();
 
     // 安装并验证磁盘文件大小
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "ws-big", description: "big", targetTools: ["cursor"], visibility: "public" },
       [skill.id],
     );
@@ -78,7 +78,7 @@ describe("L3 boundary: 大内容 / 分页 / 并发", () => {
 
     const { result } = await api.installExecute({
       projectId: agent.projectId,
-      workspaceId: ws.id,
+      capabilitySetId: ws.id,
       targetTools: ["cursor"],
       policy: "locked",
     });
@@ -109,12 +109,12 @@ describe("L3 boundary: 大内容 / 分页 / 并发", () => {
     expect(body.data).toEqual([]);
   });
 
-  it("并发创建同名 workspace → 恰好一个成功，另一个 409", async () => {
+  it("并发创建同名 capabilitySet → 恰好一个成功，另一个 409", async () => {
     server = await startServer();
     api = new ApiClient(server.baseUrl);
     await api.login("concurrent@example.com");
 
-    // 并发发起两个同名 workspace 创建请求
+    // 并发发起两个同名 capabilitySet 创建请求
     const wsInput = {
       name: "concurrent-ws",
       description: "concurrent test",
@@ -123,8 +123,8 @@ describe("L3 boundary: 大内容 / 分页 / 并发", () => {
     };
 
     const results = await Promise.allSettled([
-      api.createWorkspace(wsInput),
-      api.createWorkspace(wsInput),
+      api.createCapabilitySet(wsInput),
+      api.createCapabilitySet(wsInput),
     ]);
 
     const fulfilled = results.filter((r) => r.status === "fulfilled");

@@ -1,9 +1,9 @@
 /**
  * L3 真实链路 happy-path — 验证完整用户旅程:
  * (分层缓存验证: 此注释变更不应触发 pnpm install 重跑)
- * login → 创建 skill → 组 workspace → 注册项目 → 启动 agent → 安装 → 落盘 → lock
+ * login → 创建 skill → 组 capabilitySet → 注册项目 → 启动 agent → 安装 → 落盘 → lock
  *
- * 不变量: 安装后磁盘文件与预期一致，lock 记录正确的 workspaceId 和 policy。
+ * 不变量: 安装后磁盘文件与预期一致，lock 记录正确的 capabilitySetId 和 policy。
  * 真实性: server 和 agent 都是真实进程，通过 HTTP + WebSocket 通信。
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -39,7 +39,7 @@ describe("L3 happy-path: 全链路", () => {
     if (projectRoot) cleanupProject(projectRoot);
   });
 
-  it("登录→创建skill→组workspace→注册项目→安装→落盘", async () => {
+  it("登录→创建skill→组capabilitySet→注册项目→安装→落盘", async () => {
     // 1. 启动真实 server
     server = await startServer();
     api = new ApiClient(server.baseUrl);
@@ -52,11 +52,11 @@ describe("L3 happy-path: 全链路", () => {
     const skill = await api.createAsset(assetBuilders.skill("scout", ["cursor"]));
     expect(skill.id).toBeDefined();
 
-    // 4. 创建 workspace 并添加 skill 成员
-    const ws = await api.createWorkspace(
+    // 4. 创建 capabilitySet 并添加 skill 成员
+    const ws = await api.createCapabilitySet(
       {
         name: "test-ws",
-        description: "happy path workspace",
+        description: "happy path capabilitySet",
         targetTools: ["cursor"],
         visibility: "public",
       },
@@ -87,7 +87,7 @@ describe("L3 happy-path: 全链路", () => {
     // 7. 生成安装计划
     const plan = await api.installPlan({
       projectId: agent.projectId,
-      workspaceId: ws.id,
+      capabilitySetId: ws.id,
       targetTools: ["cursor"],
       policy: "auto",
     });
@@ -97,7 +97,7 @@ describe("L3 happy-path: 全链路", () => {
     // 8. 执行安装
     const { result } = await api.installExecute({
       projectId: agent.projectId,
-      workspaceId: ws.id,
+      capabilitySetId: ws.id,
       targetTools: ["cursor"],
       policy: "auto",
     });
@@ -108,7 +108,7 @@ describe("L3 happy-path: 全链路", () => {
     expectFileExists(projectRoot, ".cursor/skills/scout/SKILL.md");
     expectFileSet(projectRoot, [".cursor/skills/scout/SKILL.md"]);
 
-    // 10. 断言 lock: workspaceId + policy 正确
-    expectLock(agent.projectId, { workspaceId: ws.id, policy: "auto" });
+    // 10. 断言 lock: capabilitySetId + policy 正确
+    expectLock(agent.projectId, { capabilitySetId: ws.id, policy: "auto" });
   });
 });

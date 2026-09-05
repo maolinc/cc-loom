@@ -328,6 +328,6 @@ function applySuccess(projectId: string, ok: ProcessOk): void {
 
   // reconcile-end 钩子（ADR-0003 决策 8）：刷新本项目的凭据使用记录。
   // 用本次 plan 的 enabled∪disabled assetId 全集 + 各自的 path 绑定，insert-only 超集 +
-  // 移除已不再装的 asset 行。空间级与能力级流程都收敛到这里，不可能漏某个路径。
+  // 移除已不再装的 asset 行。能力集级与能力级流程都收敛到这里，不可能漏某个路径。
   refreshCredentialUsages(projectId);
 }

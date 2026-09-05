@@ -78,9 +78,9 @@ program
 
 program
   .command("push")
-  .description("推送本地厂商目录到平台，创建或覆盖工作空间")
+  .description("推送本地厂商目录到平台，创建或覆盖能力集")
   .option("--tool <tool>", "指定厂商 (cursor|codebuddy|codex|claudecode)")
-  .option("--name <name>", "自定义工作空间名称（默认: 用户名/项目目录名）")
+  .option("--name <name>", "自定义能力集名称（默认: 用户名/项目目录名）")
   .option("--visibility <visibility>", "可见性 public|private（默认: private）")
   .action((opts) => runCommand(() => pushCommand(opts)));
 

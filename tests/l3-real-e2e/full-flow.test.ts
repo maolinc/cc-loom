@@ -2,7 +2,7 @@
  * L3 全链路 happy-path — add → import → refresh → settings → delete 完整周期。
  *
  * 真实 server + 真实 git clone（cc-plugin fixture）。bump SHA = 真提交。
- * 不变量: 空→默认 360→add 成功带 counts→assets 只读标记→workspace 自动生成→
+ * 不变量: 空→默认 360→add 成功带 counts→assets 只读标记→capabilitySet 自动生成→
  *         refresh 增日志→settings 持久化→重复 add 409→delete 清空。
  */
 import { describe, it, expect, afterEach } from "vitest";
@@ -37,7 +37,7 @@ describe("L3 full marketplace flow", () => {
     const source = await api.addMarketplace(fx.url);
     expect(source.lastSyncStatus).toBe("success");
     expect(source.assetCount).toBeGreaterThan(0);
-    expect(source.workspaceCount).toBe(1);
+    expect(source.capabilitySetCount).toBe(1);
 
     // 3. list 含此源
     const list = await api.listMarketplaces();
@@ -51,8 +51,8 @@ describe("L3 full marketplace flow", () => {
       expect(a.sourceId).toBe(source.id);
     }
 
-    // 5. 自动生成的 workspace
-    const wss = await api.listWorkspaces();
+    // 5. 自动生成的 capabilitySet
+    const wss = await api.listCapabilitySets();
     const plugin = wss.find((w) => w.name === "example-plugin");
     expect(plugin).toBeDefined();
 
@@ -80,7 +80,7 @@ describe("L3 full marketplace flow", () => {
     // 10. 一切归零
     expect(await api.listMarketplaces()).toEqual([]);
     expect(await api.listAssets()).toEqual([]);
-    const wsAfter = await api.listWorkspaces();
+    const wsAfter = await api.listCapabilitySets();
     expect(wsAfter.find((w) => w.name === "example-plugin")).toBeUndefined();
   });
 });

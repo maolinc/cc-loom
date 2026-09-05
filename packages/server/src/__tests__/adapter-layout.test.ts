@@ -26,8 +26,8 @@ function asset(partial: Partial<ManifestAssetEntry> & Pick<ManifestAssetEntry, "
 
 function manifestOf(assets: ManifestAssetEntry[]): Manifest {
   return {
-    workspaceId: "ws",
-    workspaceName: "ws",
+    capabilitySetId: "ws",
+    capabilitySetName: "ws",
     version: "1",
     targetTools: ["claudecode"],
     assets,

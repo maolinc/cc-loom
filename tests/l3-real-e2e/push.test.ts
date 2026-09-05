@@ -1,5 +1,5 @@
 /**
- * L3 `loom push` — POST /api/push 核心场景 + workspace 同名唯一约束。
+ * L3 `loom push` — POST /api/push 核心场景 + capabilitySet 同名唯一约束。
  *
  * 真实 server 进程 + 真实 HTTP（Bearer 鉴权）。
  * 不变量: 首推建 ws、同名覆盖、upsert 资产、鉴权、空 assets 400、单推内同名冲突 409、ws 名唯一。
@@ -46,16 +46,16 @@ describe("L3 push", () => {
     };
   }
 
-  it("creates a new workspace on first push", async () => {
+  it("creates a new capabilitySet on first push", async () => {
     await boot();
     const res = await request(server.baseUrl, "POST", "/api/push", { bearer: cliToken, body: pushPayload("push-user/my-project") });
     expect(res.status).toBe(200);
     const data = (await parseJson<any>(res)).data;
     expect(data.created).toBe(true);
-    expect(data.workspaceName).toBe("push-user/my-project");
+    expect(data.capabilitySetName).toBe("push-user/my-project");
     expect(data.assetCount).toBe(1);
 
-    const detail = await request(server.baseUrl, "GET", `/api/workspaces/${data.workspaceId}`, { cookie });
+    const detail = await request(server.baseUrl, "GET", `/api/capability-sets/${data.capabilitySetId}`, { cookie });
     expect(detail.status).toBe(200);
     const ws = (await parseJson<any>(detail)).data;
     expect(ws.name).toBe("push-user/my-project");
@@ -63,7 +63,7 @@ describe("L3 push", () => {
     expect(ws.assets[0].name).toBe("my-skill");
   });
 
-  it("overwrites workspace members on re-push with same name", async () => {
+  it("overwrites capabilitySet members on re-push with same name", async () => {
     await boot();
     const first = await request(server.baseUrl, "POST", "/api/push", { bearer: cliToken, body: pushPayload("push-user/repush") });
     expect(first.status).toBe(200);
@@ -85,10 +85,10 @@ describe("L3 push", () => {
     expect(second.status).toBe(200);
     const secondData = (await parseJson<any>(second)).data;
     expect(secondData.created).toBe(false);
-    expect(secondData.workspaceId).toBe(firstData.workspaceId);
+    expect(secondData.capabilitySetId).toBe(firstData.capabilitySetId);
     expect(secondData.assetCount).toBe(1);
 
-    const detail = await request(server.baseUrl, "GET", `/api/workspaces/${secondData.workspaceId}`, { cookie });
+    const detail = await request(server.baseUrl, "GET", `/api/capability-sets/${secondData.capabilitySetId}`, { cookie });
     const ws = (await parseJson<any>(detail)).data;
     expect(ws.assets).toHaveLength(1);
     expect(ws.assets[0].name).toBe("my-rule");
@@ -112,7 +112,7 @@ describe("L3 push", () => {
     });
     expect(second.status).toBe(200);
 
-    const wsDetail = await request(server.baseUrl, "GET", `/api/workspaces/${(await parseJson<any>(second)).data.workspaceId}`, { cookie });
+    const wsDetail = await request(server.baseUrl, "GET", `/api/capability-sets/${(await parseJson<any>(second)).data.capabilitySetId}`, { cookie });
     const ws = (await parseJson<any>(wsDetail)).data;
     expect(ws.assets[0].files).toHaveLength(1);
 
@@ -154,13 +154,13 @@ describe("L3 push", () => {
     expect(body.error).toContain("skills/westock-data");
     expect(body.error).toContain("skills/westock-data2");
 
-    const list = await request(server.baseUrl, "GET", "/api/workspaces?page=1&pageSize=30", { cookie });
+    const list = await request(server.baseUrl, "GET", "/api/capability-sets?page=1&pageSize=30", { cookie });
     const names = (await parseJson<any>(list)).data.map((w: any) => w.name);
     expect(names).not.toContain("dup/test");
   });
 });
 
-describe("L3 workspace name uniqueness", () => {
+describe("L3 capabilitySet name uniqueness", () => {
   let server: ServerHandle;
   let cookie: string;
 
@@ -173,31 +173,31 @@ describe("L3 workspace name uniqueness", () => {
     cookie = await login(server.baseUrl, "unique-user@example.com");
   }
 
-  it("POST /api/workspaces rejects duplicate name for same user", async () => {
+  it("POST /api/capability-sets rejects duplicate name for same user", async () => {
     await boot();
-    const payload = { name: "my-workspace", description: "first", targetTools: ["cursor"], visibility: "private" };
-    const first = await request(server.baseUrl, "POST", "/api/workspaces", { cookie, body: payload });
+    const payload = { name: "my-capabilitySet", description: "first", targetTools: ["cursor"], visibility: "private" };
+    const first = await request(server.baseUrl, "POST", "/api/capability-sets", { cookie, body: payload });
     expect(first.status).toBe(200);
-    const second = await request(server.baseUrl, "POST", "/api/workspaces", { cookie, body: payload });
+    const second = await request(server.baseUrl, "POST", "/api/capability-sets", { cookie, body: payload });
     expect(second.status).toBe(409);
   });
 
-  it("PUT /api/workspaces rejects rename to existing name", async () => {
+  it("PUT /api/capability-sets rejects rename to existing name", async () => {
     await boot();
-    const ws1 = await request(server.baseUrl, "POST", "/api/workspaces", { cookie, body: { name: "ws-one", description: "1", targetTools: ["cursor"], visibility: "private" } });
+    const ws1 = await request(server.baseUrl, "POST", "/api/capability-sets", { cookie, body: { name: "ws-one", description: "1", targetTools: ["cursor"], visibility: "private" } });
     const ws1Id = (await parseJson<any>(ws1)).data.id;
-    await request(server.baseUrl, "POST", "/api/workspaces", { cookie, body: { name: "ws-two", description: "2", targetTools: ["cursor"], visibility: "private" } });
+    await request(server.baseUrl, "POST", "/api/capability-sets", { cookie, body: { name: "ws-two", description: "2", targetTools: ["cursor"], visibility: "private" } });
 
-    const rename = await request(server.baseUrl, "PUT", `/api/workspaces/${ws1Id}`, { cookie, body: { name: "ws-two" } });
+    const rename = await request(server.baseUrl, "PUT", `/api/capability-sets/${ws1Id}`, { cookie, body: { name: "ws-two" } });
     expect(rename.status).toBe(409);
   });
 
-  it("allows different users to have same workspace name", async () => {
+  it("allows different users to have same capabilitySet name", async () => {
     await boot();
     const otherCookie = await login(server.baseUrl, "other-user@example.com");
-    const first = await request(server.baseUrl, "POST", "/api/workspaces", { cookie, body: { name: "shared-name", description: "1", targetTools: ["cursor"], visibility: "private" } });
+    const first = await request(server.baseUrl, "POST", "/api/capability-sets", { cookie, body: { name: "shared-name", description: "1", targetTools: ["cursor"], visibility: "private" } });
     expect(first.status).toBe(200);
-    const second = await request(server.baseUrl, "POST", "/api/workspaces", { cookie: otherCookie, body: { name: "shared-name", description: "2", targetTools: ["cursor"], visibility: "private" } });
+    const second = await request(server.baseUrl, "POST", "/api/capability-sets", { cookie: otherCookie, body: { name: "shared-name", description: "2", targetTools: ["cursor"], visibility: "private" } });
     expect(second.status).toBe(200);
   });
 });

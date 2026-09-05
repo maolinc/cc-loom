@@ -8,7 +8,7 @@ import { db } from "../db/index.js";
  * docs/asset-uniqueness-design.md §5/§6。
  *
  * 同一 `(tool, scope, identity)` 被两个及以上不同 Asset 命中即冲突 ——
- * 它们落到同一物理位置必然互相覆盖，必须在“加入工作空间”那一刻二选一。
+ * 它们落到同一物理位置必然互相覆盖，必须在“加入能力集”那一刻二选一。
  */
 export interface InstallKeyConflict {
   tool: TargetTool;
@@ -31,7 +31,7 @@ interface AssetRow {
 /**
  * 对一组 Asset 计算落盘身份载体冲突。
  *
- * 按 `(workspace, tool)` 分厂商各算一遍：对每个 Asset 的每个 compatibleTool
+ * 按 `(capabilitySet, tool)` 分厂商各算一遍：对每个 Asset 的每个 compatibleTool
  * 调 `computeInstallKey`，撞键即冲突。不支持的类型 / 不兼容的 tool 自动跳过
  * （`computeInstallKey` 返回 null）。hook 仅在附属脚本目录 `hooks/<name>/`
  * 同名时才算冲突（其 InstallKey scope 为 "hook-dir"）。

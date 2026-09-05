@@ -3,7 +3,7 @@ import { generateId } from "../lib/crypto.js";
 import { syncAssetContentToProjects } from "../lib/auto-sync.js";
 import { sourceQueries, logQueries } from "./db-helpers.js";
 import { deleteOrRetainAsset, maybeGcRetiredAsset } from "../lib/asset-gc.js";
-import { workspaceRefCount } from "../lib/workspace-gc.js";
+import { capabilitySetRefCount } from "../lib/capability-set-gc.js";
 import { enqueue as enqueueSearchIndex, removeSearchIndex } from "../lib/search-indexer.js";
 import { enqueue as enqueueAiInfo, removeAiInfoIndex } from "../lib/ai-info-indexer.js";
 import { pickProvider } from "./providers/registry.js";
@@ -191,7 +191,7 @@ function upsertPlugins(
   addedBy: string,
 ): void {
   const now = new Date().toISOString();
-  const existing = db.prepare("SELECT id, source_plugin FROM workspaces WHERE source_id = ?").all(sourceId) as { id: string; source_plugin: string }[];
+  const existing = db.prepare("SELECT id, source_plugin FROM capability_sets WHERE source_id = ?").all(sourceId) as { id: string; source_plugin: string }[];
   const existingByName = new Map(existing.map((r) => [r.source_plugin, r.id]));
   const seenPlugins = new Set<string>();
 
@@ -203,50 +203,50 @@ function upsertPlugins(
     seenPlugins.add(p.pluginName);
     const allTools = collectTools(p.assets);
 
-    let workspaceId: string;
+    let capabilitySetId: string;
     if (existingByName.has(p.pluginName)) {
-      workspaceId = existingByName.get(p.pluginName)!;
-      db.prepare(`UPDATE workspaces SET name = ?, description = ?, target_tools = ?, version = ?, updated_at = ? WHERE id = ?`).run(
-        p.pluginName, p.description, JSON.stringify(allTools), p.version, now, workspaceId,
+      capabilitySetId = existingByName.get(p.pluginName)!;
+      db.prepare(`UPDATE capability_sets SET name = ?, description = ?, target_tools = ?, version = ?, updated_at = ? WHERE id = ?`).run(
+        p.pluginName, p.description, JSON.stringify(allTools), p.version, now, capabilitySetId,
       );
     } else {
-      // 同名拦截：若用户已有同名工作空间（来自其他来源或手动创建），跳过此 plugin。
-      // 唯一索引 idx_workspaces_user_name 保证 (user_id, name) 在未软删行中唯一。
+      // 同名拦截：若用户已有同名能力集（来自其他来源或手动创建），跳过此 plugin。
+      // 唯一索引 idx_capability_sets_user_name 保证 (user_id, name) 在未软删行中唯一。
       if (userId) {
         const nameConflict = db.prepare(
-          "SELECT id FROM workspaces WHERE user_id = ? AND name = ? AND deleted_at IS NULL",
+          "SELECT id FROM capability_sets WHERE user_id = ? AND name = ? AND deleted_at IS NULL",
         ).get(userId, p.pluginName);
         if (nameConflict) {
           continue;
         }
       }
-      workspaceId = generateId();
+      capabilitySetId = generateId();
       db.prepare(`
-        INSERT INTO workspaces (id, user_id, name, description, target_tools, visibility, version, source_id, source_plugin, created_at, updated_at)
+        INSERT INTO capability_sets (id, user_id, name, description, target_tools, visibility, version, source_id, source_plugin, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, 'public', ?, ?, ?, ?, ?)
-      `).run(workspaceId, userId, p.pluginName, p.description, JSON.stringify(allTools), p.version, sourceId, p.pluginName, now, now);
+      `).run(capabilitySetId, userId, p.pluginName, p.description, JSON.stringify(allTools), p.version, sourceId, p.pluginName, now, now);
     }
 
-    // Refresh workspace_assets to match plugin's current assets
-    db.prepare("DELETE FROM workspace_assets WHERE workspace_id = ?").run(workspaceId);
+    // Refresh capability_set_assets to match plugin's current assets
+    db.prepare("DELETE FROM capability_set_assets WHERE capability_set_id = ?").run(capabilitySetId);
     for (const a of p.assets) {
       const assetId = assetIdsByPath.get(a.sourcePath);
       if (!assetId) continue;
-      db.prepare("INSERT INTO workspace_assets (id, workspace_id, asset_id) VALUES (?, ?, ?)").run(generateId(), workspaceId, assetId);
+      db.prepare("INSERT INTO capability_set_assets (id, capability_set_id, asset_id) VALUES (?, ?, ?)").run(generateId(), capabilitySetId, assetId);
     }
   }
 
-  // Remove workspaces whose plugin disappeared. If a local project still references
-  // the workspace, retain it as soft-deleted instead of violating FK semantics.
+  // Remove capability_sets whose plugin disappeared. If a local project still references
+  // the capability set, retain it as soft-deleted instead of violating FK semantics.
   for (const r of existing) {
     if (!seenPlugins.has(r.source_plugin)) {
-      if (workspaceRefCount(r.id) > 0) {
-        db.prepare("UPDATE workspaces SET deleted_at = ?, updated_at = ? WHERE id = ?").run(now, now, r.id);
+      if (capabilitySetRefCount(r.id) > 0) {
+        db.prepare("UPDATE capability_sets SET deleted_at = ?, updated_at = ? WHERE id = ?").run(now, now, r.id);
         continue;
       }
-      const assetIds = (db.prepare("SELECT asset_id FROM workspace_assets WHERE workspace_id = ?").all(r.id) as { asset_id: string }[]).map((x) => x.asset_id);
-      db.prepare("DELETE FROM workspace_assets WHERE workspace_id = ?").run(r.id);
-      db.prepare("DELETE FROM workspaces WHERE id = ?").run(r.id);
+      const assetIds = (db.prepare("SELECT asset_id FROM capability_set_assets WHERE capability_set_id = ?").all(r.id) as { asset_id: string }[]).map((x) => x.asset_id);
+      db.prepare("DELETE FROM capability_set_assets WHERE capability_set_id = ?").run(r.id);
+      db.prepare("DELETE FROM capability_sets WHERE id = ?").run(r.id);
       for (const assetId of assetIds) maybeGcRetiredAsset(assetId);
     }
   }
@@ -260,7 +260,7 @@ function collectTools(assets: ImportedAsset[]): TargetTool[] {
 
 /**
  * 按数据源的 `assetTypesFilter` 过滤 provider 解析结果。`null` = 全部类型；
- * 否则仅保留列出的类型，并丢弃过滤后无 asset 的 plugin（避免空工作空间）。
+ * 否则仅保留列出的类型，并丢弃过滤后无 asset 的 plugin（避免空能力集）。
  * childSources 不受影响（它们是待注册的子源，不是 asset）。
  */
 function applyAssetTypeFilter(result: ProviderResult, filter: AssetType[] | null): ProviderResult {

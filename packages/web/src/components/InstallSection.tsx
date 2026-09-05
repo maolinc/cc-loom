@@ -13,10 +13,10 @@ import { generateInstallPlan, executeInstall } from "../lib/installFlow.js";
 
 interface Props {
   assetId?: string;
-  workspaceId?: string;
+  capabilitySetId?: string;
 }
 
-export default function InstallSection({ assetId, workspaceId }: Props) {
+export default function InstallSection({ assetId, capabilitySetId }: Props) {
   const toast = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -56,8 +56,8 @@ export default function InstallSection({ assetId, workspaceId }: Props) {
   const availableTools = project?.detectedTargets || [];
   const activeTools = targetTools.length > 0 ? targetTools : availableTools;
   // 单 Asset 安装走 /capabilities/add（project_capabilities，直接安装，无预览）；
-  // Workspace 安装走 installFlow（计划预览 → 确认执行）。
-  const isSingleAsset = !!assetId && !workspaceId;
+  // CapabilitySet 安装走 installFlow（计划预览 → 确认执行）。
+  const isSingleAsset = !!assetId && !capabilitySetId;
 
   // 安装参数变化 → 作废已生成的 plan，避免展示陈旧 diff 与实际执行参数不一致。
   useEffect(() => {
@@ -65,14 +65,14 @@ export default function InstallSection({ assetId, workspaceId }: Props) {
     setShowDiff(false);
     setResult(null);
     setConflicts(null);
-  }, [selectedProject, policy, targetTools, assetId, workspaceId]);
+  }, [selectedProject, policy, targetTools, assetId, capabilitySetId]);
 
   const generatePlan = async () => {
-    if (!selectedProject || isSingleAsset || !workspaceId) return;
+    if (!selectedProject || isSingleAsset || !capabilitySetId) return;
     setPlanning(true);
     const res = await generateInstallPlan({
       projectId: selectedProject,
-      workspaceId,
+      capabilitySetId,
       targetTools: activeTools,
       policy,
     });
@@ -105,10 +105,10 @@ export default function InstallSection({ assetId, workspaceId }: Props) {
       toast.success(`已安装到 ${project?.projectName || "项目"}`, msg);
       return;
     }
-    if (!workspaceId) return;
+    if (!capabilitySetId) return;
     const res = await executeInstall({
       projectId: selectedProject,
-      workspaceId,
+      capabilitySetId,
       targetTools: activeTools,
       policy,
       skipAssetIds,
@@ -146,7 +146,7 @@ export default function InstallSection({ assetId, workspaceId }: Props) {
       <div>
         <div className="text-xs font-semibold text-text-primary mb-3">安装到本地项目</div>
         <p className="text-xs text-text-muted leading-relaxed mb-3">
-          登录后可以把公开能力或工作空间安装到已注册的本地项目。
+          登录后可以把公开能力或能力集安装到已注册的本地项目。
         </p>
         <Button variant="secondary" size="sm" fullWidth onClick={() => navigate("/login")}>
           登录后安装
@@ -216,7 +216,7 @@ export default function InstallSection({ assetId, workspaceId }: Props) {
                 {`安装到 ${project?.projectName || ""}`}
               </Button>
               <p className="text-[10px] text-text-muted mt-2 leading-relaxed">
-                作为项目级能力直接安装（加入 project_capabilities），不依赖工作空间。
+                作为项目级能力直接安装（加入 project_capabilities），不依赖能力集。
               </p>
               {result && (
                 <p className={`text-xs mt-2 flex items-center justify-center gap-1 ${result.ok ? "text-mcp-green-text" : "text-red-500"}`}>

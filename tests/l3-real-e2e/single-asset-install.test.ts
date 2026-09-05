@@ -1,11 +1,11 @@
 /**
  * L3 单独安装（type 2）— 验证 `/capabilities/add` 把市场 asset 作为项目级能力
- * 直接安装到 project_capabilities（无需 workspace、不 fan-out、不创建 implicit-workspace）。
+ * 直接安装到 project_capabilities（无需 capabilitySet、不 fan-out、不创建 implicit-capabilitySet）。
  *
  * 不变量：
- *  - 无 workspace 项目：add 一个 skill → 文件落盘到厂商目录，能力在 capabilities 中可见。
- *  - 已装 workspace 项目：workspace 成员 + 单独 add 的能力并存于磁盘。
- *  - 不创建显式订阅（项目 subscriptions 中无 workspaceId 非空条目）。
+ *  - 无 capabilitySet 项目：add 一个 skill → 文件落盘到厂商目录，能力在 capabilities 中可见。
+ *  - 已装 capabilitySet 项目：capabilitySet 成员 + 单独 add 的能力并存于磁盘。
+ *  - 不创建显式订阅（项目 subscriptions 中无 capabilitySetId 非空条目）。
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
@@ -57,7 +57,7 @@ describe("L3 single-asset install: /capabilities/add → project_capabilities", 
     return { projectId: agent.projectId, token };
   }
 
-  it("无 workspace 项目：add skill → 落盘 + 不创建 implicit workspace", async () => {
+  it("无 capabilitySet 项目：add skill → 落盘 + 不创建 implicit capabilitySet", async () => {
     const { projectId } = await setup();
     const skill = await api.createAsset(assetBuilders.skill("solo-skill", ["claudecode"]));
 
@@ -67,26 +67,26 @@ describe("L3 single-asset install: /capabilities/add → project_capabilities", 
 
     // 项目仍无显式订阅（单独添加的能力归属隐式订阅）
     const proj = await api.getProject(projectId);
-    expect(proj.subscriptions.every((s) => s.workspaceId === null)).toBe(true);
+    expect(proj.subscriptions.every((s) => s.capabilitySetId === null)).toBe(true);
   });
 
-  it("已装 workspace 项目：workspace 成员与单独 add 的能力并存", async () => {
+  it("已装 capabilitySet 项目：capabilitySet 成员与单独 add 的能力并存", async () => {
     const { projectId } = await setup();
     const wsSkill = await api.createAsset(assetBuilders.skill("ws-skill", ["claudecode"]));
     const soloSkill = await api.createAsset(assetBuilders.skill("solo-skill", ["claudecode"]));
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "ws", description: "ws", targetTools: ["claudecode"], visibility: "public" },
       [wsSkill.id],
     );
 
-    // 先装 workspace
+    // 先装 capabilitySet
     const { result } = await api.installExecute({
-      projectId, workspaceId: ws.id, targetTools: ["claudecode"], policy: "auto",
+      projectId, capabilitySetId: ws.id, targetTools: ["claudecode"], policy: "auto",
     });
     expect(result.success).toBe(true);
     expectFileExists(projectRoot!, ".claude/skills/ws-skill/SKILL.md");
 
-    // 再单独 add 另一个 skill（走 project_capabilities，不进 workspace_assets）
+    // 再单独 add 另一个 skill（走 project_capabilities，不进 capability_set_assets）
     const res = await api.addCapability(projectId, [soloSkill.id]);
     expect(res.filesWritten.length).toBeGreaterThan(0);
     expectFileExists(projectRoot!, ".claude/skills/ws-skill/SKILL.md");

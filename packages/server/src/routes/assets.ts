@@ -302,7 +302,7 @@ export function assetRoutes(app: FastifyInstance) {
   });
 
   /**
-   * On-demand single-file content lookup. Used by the workspace detail panel,
+   * On-demand single-file content lookup. Used by the capabilitySet detail panel,
    * which receives files (path + size only) up-front and fetches content for
    * the file the user is actually viewing.
    */
@@ -428,7 +428,7 @@ export function assetRoutes(app: FastifyInstance) {
       if (refs.total > 0) {
         return reply.status(409).send({
           success: false,
-          error: "该能力已被工作空间或本地项目引用，不能修改名称；如需调整展示文案，请修改别名",
+          error: "该能力已被能力集或本地项目引用，不能修改名称；如需调整展示文案，请修改别名",
         });
       }
     }
@@ -496,7 +496,7 @@ export function assetRoutes(app: FastifyInstance) {
       return reply.status(403).send({ success: false, error: "只能删除自己创建的能力" });
     }
 
-    // 使用中（被工作空间组合或某项目安装引用）→ 软删留存；未使用 → 直接硬删。
+    // 使用中（被能力集组合或某项目安装引用）→ 软删留存；未使用 → 直接硬删。
     deleteOrRetainAsset(existing.id);
 
     return { success: true };

@@ -219,40 +219,40 @@ export interface AssetUpdateInput {
   auth?: AssetAuth;
 }
 
-// ============ Workspace ============
+// ============ CapabilitySet ============
 
-export interface WorkspaceAsset {
+export interface CapabilitySetAsset {
   assetId: string;
   asset: Asset;
 }
 
-export interface Workspace {
+export interface CapabilitySet {
   id: string;
   name: string;
   description: string;
-  assets: WorkspaceAsset[];
+  assets: CapabilitySetAsset[];
   targetTools: TargetTool[];
   visibility: Visibility;
   version: string;
-  /** 创建者邮箱（本地创建的工作空间的作者）。 */
+  /** 创建者邮箱（本地创建的能力集的作者）。 */
   author?: string | null;
   sourceId?: string | null;
   sourceDisplayName?: string | null;
   sourceAddedBy?: string | null;
-  /** 来源仓库地址（导入的工作空间才有）。 */
+  /** 来源仓库地址（导入的能力集才有）。 */
   sourceUrl?: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface WorkspaceCreateInput {
+export interface CapabilitySetCreateInput {
   name: string;
   description: string;
   targetTools: TargetTool[];
   visibility: Visibility;
 }
 
-export interface WorkspaceUpdateInput {
+export interface CapabilitySetUpdateInput {
   name?: string;
   description?: string;
   assetIds?: string[];
@@ -286,34 +286,34 @@ export interface ManifestAssetEntry {
 }
 
 export interface Manifest {
-  workspaceId: string;
-  workspaceName: string;
+  capabilitySetId: string;
+  capabilitySetName: string;
   version: string;
   targetTools: TargetTool[];
   assets: ManifestAssetEntry[];
 }
 
-// ============ Workspace Subscription（ADR-0006） ============
+// ============ Capability Set Subscription（ADR-0006） ============
 
 /**
- * 空间订阅：项目与 Workspace 之间的一条安装关系记录。
+ * 能力集订阅：项目与 CapabilitySet 之间的一条安装关系记录。
  *
  * - 一个项目可同时持有多条订阅，能力叠加生效；同一 asset id 跨订阅共享单例，
  *   按 (能力 × 厂商) 引用计数，最后一个引用者卸载时才撤文件。
- * - `workspaceId = null` 表示隐式订阅：本地控制台「单独添加的能力」组
- *   （对应 project_capabilities），不指向任何 Workspace。
+ * - `capabilitySetId = null` 表示隐式订阅：本地控制台「单独添加的能力」组
+ *   （对应 project_capabilities），不指向任何 CapabilitySet。
  * - syncPolicy / targetTools 均挂在订阅上，不再挂在项目上。
  */
-export interface WorkspaceSubscription {
-  /** 订阅的工作空间 id；null = 隐式订阅（project_capabilities 单项能力组）。 */
-  workspaceId: string | null;
+export interface CapabilitySetSubscription {
+  /** 订阅的能力集 id；null = 隐式订阅（project_capabilities 单项能力组）。 */
+  capabilitySetId: string | null;
   /** 展示名（list/detail 接口富化）；隐式订阅为 null，UI 渲染为「单独添加的能力」。 */
-  workspaceName?: string | null;
+  capabilitySetName?: string | null;
   syncPolicy: SyncPolicy;
   /** 该订阅的落盘厂商集合；null = 跟随项目有效工具集合（隐式订阅）。 */
   targetTools: TargetTool[] | null;
   installedAt: string;
-  /** 显式订阅：空间已从库删除，仅因本项目仍在使用而留存。 */
+  /** 显式订阅：能力集已从库删除，仅因本项目仍在使用而留存。 */
   retained?: boolean;
 }
 
@@ -365,10 +365,10 @@ export interface LockAggregateEntry {
 
 export interface LockFile {
   /**
-   * 当前生效的空间订阅快照（含隐式订阅；隐式订阅不一定出现——它只影响 policy/targetTools
+   * 当前生效的能力集订阅快照（含隐式订阅；隐式订阅不一定出现——它只影响 policy/targetTools
    * 的默认语义，lock 里只记录显式订阅即可）。reconcile v3 每次整体重写。
    */
-  subscriptions: WorkspaceSubscription[];
+  subscriptions: CapabilitySetSubscription[];
   version: string;
   assets: Record<string, LockAssetEntry>;
   /** 各厂商的聚合文件登记（mcp.json、hooks.json）。capabilities 流程下使用。 */
@@ -377,13 +377,9 @@ export interface LockFile {
    * Lock 文件格式版本。缺省视作 v1（含 v1 per-asset 和更早的 legacy `__plan__`）。
    * v2 reconcile handler 写入时填 "2"；首次从 v1 升级时，从原 lock 中提取
    * 已 disabled 的 (assetId, tool) 集合通过响应回传 server。
-   * "3"：多空间订阅（ADR-0006），workspaceId/policy 单值字段被 subscriptions 取代。
+   * "3"：多能力集订阅（ADR-0006），旧单值字段被 subscriptions 取代。
    */
   lockFormat?: "2" | "3";
-  /** @deprecated v3 起由 subscriptions 取代；仅为读取旧 lock 迁移保留。 */
-  workspaceId?: string | null;
-  /** @deprecated v3 起由 subscriptions 取代；仅为读取旧 lock 迁移保留。 */
-  policy?: SyncPolicy;
 }
 
 // ============ Project ============
@@ -398,11 +394,11 @@ export interface Project {
   detectedTargets: TargetTool[];
   defaultTargets: TargetTool[];
   /**
-   * 项目的空间订阅集合（ADR-0006）。显式订阅（workspaceId 非空）+ 至多一条隐式订阅
-   * （workspaceId=null，「单独添加的能力」组）。list/detail 接口恒返回；注册响应等
+   * 项目的能力集订阅集合（ADR-0006）。显式订阅（capabilitySetId 非空）+ 至多一条隐式订阅
+   * （capabilitySetId=null，「单独添加的能力」组）。list/detail 接口恒返回；注册响应等
    * 轻量场景可为空数组。
    */
-  subscriptions: WorkspaceSubscription[];
+  subscriptions: CapabilitySetSubscription[];
   status: ProjectStatus;
 }
 
@@ -440,12 +436,12 @@ export interface DiffEntry {
 }
 
 /**
- * 安装冲突：待装空间里与项目现有受管能力「同名不同 id」的 asset（落盘路径必然撞车）。
+ * 安装冲突：待装能力集里与项目现有受管能力「同名不同 id」的 asset（落盘路径必然撞车）。
  * 用户在安装流程中逐条裁决（跳过该能力 / 全部跳过 / 取消），execute 携带
  * skipAssetIds（incomingAssetId 集合）完成裁决。
  */
 export interface InstallConflict {
-  /** 待装空间里撞车的 asset id。 */
+  /** 待装能力集里撞车的 asset id。 */
   incomingAssetId: string;
   /** 项目中已存在的同名 asset id（被其他订阅或单独添加占用）。 */
   existingAssetId: string;
@@ -454,8 +450,8 @@ export interface InstallConflict {
 }
 
 export interface InstallPlan {
-  workspaceId: string;
-  workspaceName: string;
+  capabilitySetId: string;
+  capabilitySetName: string;
   projectId: string;
   projectName: string;
   targetTools: TargetTool[];
@@ -468,7 +464,7 @@ export interface InstallPlan {
 
 export interface InstallResult {
   success: boolean;
-  workspaceId: string;
+  capabilitySetId: string;
   projectId: string;
   completedAt: string;
   filesWritten: string[];
@@ -537,7 +533,7 @@ export interface LocalProjectState {
   /** 4 个厂商恒在；TargetTool 之外不出现 */
   vendors: Record<TargetTool, VendorMirror>;
   /** 来自 lock，agent 视角下的真值；本地 lock 不存在或已被自动清空时为空数组 */
-  installedWorkspaceIds: string[];
+  installedCapabilitySetIds: string[];
   /** 本次 scan 是否触发了"lock 中文件全部缺失 → 自动清 lock"修复 */
   driftCleared: boolean;
   /**
@@ -575,10 +571,10 @@ export interface AssetCapability {
    */
   hookEvents?: string[];
   /**
-   * 来源订阅（server 端富化，控制台「来源空间」徽标）：该能力被哪些订阅引用。
-   * 多个 = 共享能力；workspaceId=null 表示「单独添加」（隐式订阅）。
+   * 来源订阅（server 端富化，控制台「来源能力集」徽标）：该能力被哪些订阅引用。
+   * 多个 = 共享能力；capabilitySetId=null 表示「单独添加」（隐式订阅）。
    */
-  sources?: { workspaceId: string | null; name: string }[];
+  sources?: { capabilitySetId: string | null; name: string }[];
 }
 
 export interface AssetCapabilityVendor {
@@ -629,7 +625,7 @@ export interface AssetSearchParams {
   pageSize?: number;
 }
 
-export interface WorkspaceSearchParams {
+export interface CapabilitySetSearchParams {
   query?: string;
   visibility?: Visibility;
   page?: number;
@@ -653,7 +649,7 @@ export interface WsMessage<T = unknown> {
 
 export interface WsInstallRequest {
   projectId: string;
-  workspaceId: string;
+  capabilitySetId: string;
   targetTools: TargetTool[];
   policy: SyncPolicy;
 }
@@ -761,14 +757,14 @@ export interface ReconcilePlan {
  * server→CLI 的 reconcile op 请求体。
  *
  * - `subscriptions`：本次 plan 期望生效的订阅快照（显式 + 隐式），CLI 原样写入 lock；
- *   空数组 = 项目未安装任何空间（清空状态）。
+ *   空数组 = 项目未安装任何能力集（清空状态）。
  * - `targetTools`：本项目的有效 tool 集合（全部订阅 targetTools 的并集；
  *   隐式订阅取项目有效工具）；CLI 用于在 plan 之外做兜底清理。
  */
 export interface WsReconcileRequest {
   requestId: string;
   projectId: string;
-  subscriptions: WorkspaceSubscription[];
+  subscriptions: CapabilitySetSubscription[];
   targetTools: TargetTool[];
   plan: ReconcilePlan;
 }
@@ -783,7 +779,7 @@ export interface WsReconcileRequest {
 export interface WsReconcileResponseData {
   filesWritten: string[];
   filesRemoved: string[];
-  lockWorkspaceIds: string[];
+  lockCapabilitySetIds: string[];
   migrationDisabled?: Array<{ assetId: string; tool: TargetTool }>;
 }
 
@@ -796,7 +792,7 @@ export interface WsReconcileResponseData {
 export interface AgentCapabilities {
   reconcileV2?: boolean;
   /**
-   * 多空间订阅协议（ADR-0006）：reconcile op 携带 subscriptions 数组、lock 写 v3。
+   * 多能力集订阅协议（ADR-0006）：reconcile op 携带 subscriptions 数组、lock 写 v3。
    * server 硬门槛：不支持即拒连（产品未上线，不维护旧协议兼容层）。
    */
   subscriptionsV3?: boolean;
@@ -853,7 +849,7 @@ export interface MarketplaceSource {
 
 export interface MarketplaceSourceWithCounts extends MarketplaceSource {
   assetCount: number;
-  workspaceCount: number;
+  capabilitySetCount: number;
 }
 
 export interface MarketplaceSyncLog {
@@ -1078,10 +1074,10 @@ export interface ProviderResult {
 
 /**
  * `loom push` 请求体：CLI 读取本地厂商目录、解析为 ImportedAsset[] 后发送给 Server。
- * Server 按 (author, type, name) upsert asset，按 (user_id, name) upsert workspace。
+ * Server 按 (author, type, name) upsert asset，按 (user_id, name) upsert capability set。
  */
 export interface PushRequest {
-  /** 工作空间名称，默认格式 `用户名/项目目录名`，如 `maolinc/aa` */
+  /** 能力集名称，默认格式 `用户名/项目目录名`，如 `maolinc/aa` */
   name: string;
   visibility: Visibility;
   /** 推送的来源厂商目录 */
@@ -1090,9 +1086,9 @@ export interface PushRequest {
 }
 
 export interface PushResult {
-  workspaceId: string;
-  workspaceName: string;
-  /** true = 新建工作空间；false = 覆盖已有同名工作空间 */
+  capabilitySetId: string;
+  capabilitySetName: string;
+  /** true = 新建能力集；false = 覆盖已有同名能力集 */
   created: boolean;
   assetCount: number;
 }

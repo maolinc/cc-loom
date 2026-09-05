@@ -19,9 +19,9 @@ import type {
   SessionUser,
   TargetTool,
   Visibility,
-  Workspace,
-  WorkspaceCreateInput,
-  WorkspaceUpdateInput,
+  CapabilitySet,
+  CapabilitySetCreateInput,
+  CapabilitySetUpdateInput,
   SyncPolicy,
   Device,
   ToolConfigDistribution,
@@ -100,30 +100,30 @@ export class ApiClient {
     await this.del(`/api/assets/${id}`);
   }
 
-  // ---- Workspaces ----
+  // ---- CapabilitySets ----
 
-  async createWorkspace(
-    input: WorkspaceCreateInput,
+  async createCapabilitySet(
+    input: CapabilitySetCreateInput,
     assetIds?: string[],
-  ): Promise<Workspace> {
+  ): Promise<CapabilitySet> {
     const body = assetIds ? { ...input, assetIds } : input;
-    return this.post<Workspace>("/api/workspaces", body);
+    return this.post<CapabilitySet>("/api/capability-sets", body);
   }
 
-  async getWorkspace(id: string): Promise<Workspace> {
-    return this.get<Workspace>(`/api/workspaces/${id}`);
+  async getCapabilitySet(id: string): Promise<CapabilitySet> {
+    return this.get<CapabilitySet>(`/api/capability-sets/${id}`);
   }
 
-  async updateWorkspace(id: string, input: WorkspaceUpdateInput): Promise<Workspace> {
-    return this.put<Workspace>(`/api/workspaces/${id}`, input);
+  async updateCapabilitySet(id: string, input: CapabilitySetUpdateInput): Promise<CapabilitySet> {
+    return this.put<CapabilitySet>(`/api/capability-sets/${id}`, input);
   }
 
-  async listWorkspaces(): Promise<Workspace[]> {
-    return this.get<Workspace[]>("/api/workspaces");
+  async listCapabilitySets(): Promise<CapabilitySet[]> {
+    return this.get<CapabilitySet[]>("/api/capability-sets");
   }
 
-  async deleteWorkspace(id: string): Promise<void> {
-    await this.del(`/api/workspaces/${id}`);
+  async deleteCapabilitySet(id: string): Promise<void> {
+    await this.del(`/api/capability-sets/${id}`);
   }
 
   // ---- Projects ----
@@ -140,7 +140,7 @@ export class ApiClient {
 
   async installPlan(input: {
     projectId: string;
-    workspaceId: string;
+    capabilitySetId: string;
     targetTools: TargetTool[];
     policy: SyncPolicy;
   }): Promise<InstallPlan> {
@@ -149,7 +149,7 @@ export class ApiClient {
 
   async installExecute(input: {
     projectId: string;
-    workspaceId: string;
+    capabilitySetId: string;
     targetTools: TargetTool[];
     policy: SyncPolicy;
     skipAssetIds?: string[];
@@ -157,29 +157,29 @@ export class ApiClient {
     return this.post<{ plan: InstallPlan; result: InstallResult }>("/api/install/execute", input);
   }
 
-  // ---- Subscriptions（ADR-0006 多空间订阅）----
+  // ---- Subscriptions（ADR-0006 多能力集订阅）----
 
   /** 卸载一条显式订阅。 */
-  async unsubscribeWorkspace(projectId: string, workspaceId: string): Promise<void> {
-    await this.del(`/api/projects/${projectId}/subscriptions/${workspaceId}`);
+  async unsubscribeCapabilitySet(projectId: string, capabilitySetId: string): Promise<void> {
+    await this.del(`/api/projects/${projectId}/subscriptions/${capabilitySetId}`);
   }
 
-  /** 修改订阅同步策略；wid 传 "implicit" 表示隐式订阅（单独添加的能力组）。 */
+  /** 修改订阅同步策略；capabilitySetId 传 "implicit" 表示隐式订阅（单独添加的能力组）。 */
   async setSubscriptionPolicy(
     projectId: string,
-    wid: string,
+    capabilitySetId: string,
     policy: SyncPolicy,
   ): Promise<void> {
-    await this.post(`/api/projects/${projectId}/subscriptions/${wid}/sync-policy`, { policy });
+    await this.post(`/api/projects/${projectId}/subscriptions/${capabilitySetId}/sync-policy`, { policy });
   }
 
   /** 修改显式订阅的落盘厂商集合。 */
   async setSubscriptionTargets(
     projectId: string,
-    workspaceId: string,
+    capabilitySetId: string,
     targets: TargetTool[],
   ): Promise<{ filesWritten: string[]; filesRemoved: string[] }> {
-    return this.post(`/api/projects/${projectId}/subscriptions/${workspaceId}/targets`, { targets });
+    return this.post(`/api/projects/${projectId}/subscriptions/${capabilitySetId}/targets`, { targets });
   }
 
   // ---- Devices ----

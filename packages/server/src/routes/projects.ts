@@ -6,9 +6,9 @@ import { db } from "../db/index.js";
 import { generateId } from "../lib/crypto.js";
 import { projectRegisterSchema } from "@maolinc/cc-loom-shared";
 import { requireCliAuth, requireAnyAuth } from "../lib/auth.js";
-import { maybeGcRetiredWorkspace } from "../lib/workspace-gc.js";
+import { maybeGcRetiredCapabilitySet } from "../lib/capability-set-gc.js";
 import { loadAssetEntries } from "../lib/asset-manifest.js";
-import { syncProjectNow, syncWorkspaceMembersToProjects } from "../lib/auto-sync.js";
+import { syncProjectNow, syncCapabilitySetMembersToProjects } from "../lib/auto-sync.js";
 import { enqueueReconcileAndWait } from "../lib/outbox-worker-v2.js";
 import { purgeProjectDbRows, hardDeleteProject } from "../lib/project-purge.js";
 import { enrichCapabilitiesHookEvents } from "../lib/hook-events.js";
@@ -174,15 +174,16 @@ export function projectRoutes(app: FastifyInstance) {
   });
 
   /**
-   * POST /api/projects/:id/subscriptions/:wid/sync-policy
+   * POST /api/projects/:id/subscriptions/:capabilitySetId/sync-policy
    * body: { policy: "auto" | "locked" }
-   * 修改某条订阅的同步策略（ADR-0006：策略挂在订阅上）。wid = "implicit" 表示隐式订阅
-   * （「单独添加的能力」组）。auto 时该空间/能力的后续编辑会自动回推到本项目。
+   * 修改某条订阅的同步策略（ADR-0006：策略挂在订阅上）。capabilitySetId =
+   * "implicit" 表示隐式订阅（「单独添加的能力」组）。auto 时该能力集或能力的
+   * 后续编辑会自动回推到本项目。
    */
-  app.post("/api/projects/:id/subscriptions/:wid/sync-policy", { preHandler: [requireAnyAuth] }, async (request, reply) => {
+  app.post("/api/projects/:id/subscriptions/:capabilitySetId/sync-policy", { preHandler: [requireAnyAuth] }, async (request, reply) => {
     const projectId = (request.params as any).id as string;
-    const wid = (request.params as any).wid as string;
-    const workspaceId = wid === "implicit" ? "" : wid;
+    const requestedCapabilitySetId = (request.params as any).capabilitySetId as string;
+    const capabilitySetId = requestedCapabilitySetId === "implicit" ? "" : requestedCapabilitySetId;
     const policy = String((request.body as any)?.policy ?? "");
     if (policy !== "auto" && policy !== "locked") {
       return reply.status(400).send({ success: false, error: "policy 必须为 auto 或 locked" });
@@ -194,28 +195,28 @@ export function projectRoutes(app: FastifyInstance) {
       return reply.status(404).send({ success: false, error: "项目不存在" });
     }
     const sub = db.prepare(
-      "SELECT 1 FROM project_subscriptions WHERE project_id = ? AND workspace_id = ?",
-    ).get(projectId, workspaceId);
+      "SELECT 1 FROM project_subscriptions WHERE project_id = ? AND capability_set_id = ?",
+    ).get(projectId, capabilitySetId);
     if (!sub) return reply.status(404).send({ success: false, error: "订阅不存在" });
     db.prepare(
-      "UPDATE project_subscriptions SET sync_policy = ? WHERE project_id = ? AND workspace_id = ?",
-    ).run(policy, projectId, workspaceId);
+      "UPDATE project_subscriptions SET sync_policy = ? WHERE project_id = ? AND capability_set_id = ?",
+    ).run(policy, projectId, capabilitySetId);
     // 从 locked 切到 auto：立即补一次同步，让本项目追平当前最新内容。
     if (policy === "auto") syncProjectNow(projectId);
     return { success: true, data: { policy } };
   });
 
   /**
-   * POST /api/projects/:id/subscriptions/:wid/targets
+   * POST /api/projects/:id/subscriptions/:capabilitySetId/targets
    * body: { targets: TargetTool[] }
    * 修改某条显式订阅的落盘厂商集合并立即 reconcile（ADR-0006：targetTools 挂在订阅上）。
    * 收窄厂商即按 (能力 × 厂商) 引用计数撤下该厂商的文件；共享能力在其它订阅覆盖的
    * 厂商下保留。
    */
-  app.post("/api/projects/:id/subscriptions/:wid/targets", { preHandler: [requireAnyAuth] }, async (request, reply) => {
+  app.post("/api/projects/:id/subscriptions/:capabilitySetId/targets", { preHandler: [requireAnyAuth] }, async (request, reply) => {
     const projectId = (request.params as any).id as string;
-    const workspaceId = (request.params as any).wid as string;
-    if (workspaceId === "implicit") {
+    const capabilitySetId = (request.params as any).capabilitySetId as string;
+    if (capabilitySetId === "implicit") {
       return reply.status(400).send({ success: false, error: "隐式订阅跟随项目厂商集合，请用 /targets 调整" });
     }
     const body = request.body as any;
@@ -227,25 +228,25 @@ export function projectRoutes(app: FastifyInstance) {
     const proj = await loadProjectForCapability(projectId, request.user!.userId, request.user!.email);
     if ("error" in proj) return reply.status(proj.status).send({ success: false, error: proj.error });
     const sub = db.prepare(
-      "SELECT 1 FROM project_subscriptions WHERE project_id = ? AND workspace_id = ?",
-    ).get(projectId, workspaceId);
+      "SELECT 1 FROM project_subscriptions WHERE project_id = ? AND capability_set_id = ?",
+    ).get(projectId, capabilitySetId);
     if (!sub) return reply.status(404).send({ success: false, error: "订阅不存在" });
     db.prepare(
-      "UPDATE project_subscriptions SET target_tools = ? WHERE project_id = ? AND workspace_id = ?",
-    ).run(JSON.stringify(targets), projectId, workspaceId);
+      "UPDATE project_subscriptions SET target_tools = ? WHERE project_id = ? AND capability_set_id = ?",
+    ).run(JSON.stringify(targets), projectId, capabilitySetId);
     const wait = await enqueueReconcileAndWait(proj.deviceId, projectId, { force: true });
     return finalizeCapabilityResponse(reply, wait);
   });
 
   /**
-   * DELETE /api/projects/:id/subscriptions/:wid
+   * DELETE /api/projects/:id/subscriptions/:capabilitySetId
    * 卸载一条显式订阅：删订阅行 + 跳过集 → reconcile（removed 经账本计算，共享能力按
-   * 引用计数保留）→ GC 留存空间。
+   * 引用计数保留）→ GC 留存能力集。
    */
-  app.delete("/api/projects/:id/subscriptions/:wid", { preHandler: [requireAnyAuth] }, async (request, reply) => {
+  app.delete("/api/projects/:id/subscriptions/:capabilitySetId", { preHandler: [requireAnyAuth] }, async (request, reply) => {
     const projectId = (request.params as any).id as string;
-    const workspaceId = (request.params as any).wid as string;
-    if (workspaceId === "implicit") {
+    const capabilitySetId = (request.params as any).capabilitySetId as string;
+    if (capabilitySetId === "implicit") {
       return reply.status(400).send({ success: false, error: "隐式订阅不可整体卸载，请逐个移除能力" });
     }
     const row = db.prepare("SELECT device_id, user_id FROM projects WHERE id = ?").get(projectId) as
@@ -255,20 +256,20 @@ export function projectRoutes(app: FastifyInstance) {
       return reply.status(404).send({ success: false, error: "项目不存在" });
     }
     const sub = db.prepare(
-      "SELECT 1 FROM project_subscriptions WHERE project_id = ? AND workspace_id = ?",
-    ).get(projectId, workspaceId);
+      "SELECT 1 FROM project_subscriptions WHERE project_id = ? AND capability_set_id = ?",
+    ).get(projectId, capabilitySetId);
     if (!sub) return reply.status(404).send({ success: false, error: "订阅不存在" });
     if (!getAgent(row.device_id)) {
       return reply.status(409).send({ success: false, error: "Agent 未在线" });
     }
     db.prepare(
-      "DELETE FROM project_subscriptions WHERE project_id = ? AND workspace_id = ?",
-    ).run(projectId, workspaceId);
+      "DELETE FROM project_subscriptions WHERE project_id = ? AND capability_set_id = ?",
+    ).run(projectId, capabilitySetId);
     db.prepare(
-      "DELETE FROM project_subscription_excludes WHERE project_id = ? AND workspace_id = ?",
-    ).run(projectId, workspaceId);
+      "DELETE FROM project_subscription_excludes WHERE project_id = ? AND capability_set_id = ?",
+    ).run(projectId, capabilitySetId);
     const wait = await enqueueReconcileAndWait(row.device_id, projectId, { force: true });
-    maybeGcRetiredWorkspace(workspaceId);
+    maybeGcRetiredCapabilitySet(capabilitySetId);
     if (wait.kind !== "ok") {
       // 订阅已删但落盘失败：不回滚（权威状态已是「未订阅」），由下次 reconcile 补齐。
       return reply.status(502).send({
@@ -298,8 +299,8 @@ export function projectRoutes(app: FastifyInstance) {
     // 推送 project:state，避免删行期间滞后的 state 写入触发 project_installed_assets
     // 外键违例。
     const prevSubscribed = db.prepare(
-      "SELECT workspace_id FROM project_subscriptions WHERE project_id = ? AND workspace_id != ''",
-    ).all(row.id) as { workspace_id: string }[];
+      "SELECT capability_set_id FROM project_subscriptions WHERE project_id = ? AND capability_set_id != ''",
+    ).all(row.id) as { capability_set_id: string }[];
     if (getAgent(row.device_id)) {
       try {
         await requestFromAgent<{ projectId: string }>(
@@ -311,7 +312,7 @@ export function projectRoutes(app: FastifyInstance) {
     }
     purgeProjectDbRows(row.id);
     db.prepare("DELETE FROM projects WHERE id = ?").run(row.id);
-    for (const s of prevSubscribed) maybeGcRetiredWorkspace(s.workspace_id);
+    for (const s of prevSubscribed) maybeGcRetiredCapabilitySet(s.capability_set_id);
     return { success: true };
   });
 
@@ -336,8 +337,8 @@ export function projectRoutes(app: FastifyInstance) {
     }
 
     const prevSubscribed = db.prepare(
-      "SELECT workspace_id FROM project_subscriptions WHERE project_id = ? AND workspace_id != ''",
-    ).all(projectId) as { workspace_id: string }[];
+      "SELECT capability_set_id FROM project_subscriptions WHERE project_id = ? AND capability_set_id != ''",
+    ).all(projectId) as { capability_set_id: string }[];
     // 1. 服务端关联表清理（不动项目行：深度/浅度分支再决定硬删还是软删）
     purgeProjectDbRows(projectId);
 
@@ -368,7 +369,7 @@ export function projectRoutes(app: FastifyInstance) {
     // 浅度清理：软删项目行（status=unregistered），保留以备 agent 重连自愈。
     db.prepare("UPDATE projects SET status = 'unregistered' WHERE id = ?")
       .run(projectId);
-    for (const s of prevSubscribed) maybeGcRetiredWorkspace(s.workspace_id);
+    for (const s of prevSubscribed) maybeGcRetiredCapabilitySet(s.capability_set_id);
     broadcastToWebClients("web:project:state_changed", { projectId });
     return {
       success: true,
@@ -520,7 +521,7 @@ export function projectRoutes(app: FastifyInstance) {
   /**
    * POST /api/projects/:id/uninstall
    * 卸载全部：让 agent 按 lock 清空已安装文件 + lock 自身，server 端删除全部显式订阅。
-   * 单订阅卸载用 DELETE /api/projects/:id/subscriptions/:wid。
+   * 单订阅卸载用 DELETE /api/projects/:id/subscriptions/:capabilitySetId。
    */
   app.post("/api/projects/:id/uninstall", { preHandler: [requireAnyAuth] }, async (request, reply) => {
     const projectId = (request.params as any).id as string;
@@ -539,12 +540,12 @@ export function projectRoutes(app: FastifyInstance) {
       );
       if (result.success) {
         const subs = db.prepare(
-          "SELECT workspace_id FROM project_subscriptions WHERE project_id = ? AND workspace_id != ''",
-        ).all(projectId) as { workspace_id: string }[];
-        db.prepare("DELETE FROM project_subscriptions WHERE project_id = ? AND workspace_id != ''")
+          "SELECT capability_set_id FROM project_subscriptions WHERE project_id = ? AND capability_set_id != ''",
+        ).all(projectId) as { capability_set_id: string }[];
+        db.prepare("DELETE FROM project_subscriptions WHERE project_id = ? AND capability_set_id != ''")
           .run(projectId);
         db.prepare("DELETE FROM project_subscription_excludes WHERE project_id = ?").run(projectId);
-        for (const s of subs) maybeGcRetiredWorkspace(s.workspace_id);
+        for (const s of subs) maybeGcRetiredCapabilitySet(s.capability_set_id);
       }
       return { success: true, data: result };
     } catch (err: any) {
@@ -556,8 +557,8 @@ export function projectRoutes(app: FastifyInstance) {
   // v2 wire 协议下,三个动作都是「写 server 权威状态 → enqueueReconcile → 等待 CLI
   // 落盘」的统一模式:
   //   - toggle  : 写/删 project_disabled_assets 表(per-project 的 toggle 权威源)
-  //   - add     : 写 workspace_assets,扩展项目所在工作空间的成员
-  //   - remove  : 删 workspace_assets
+  //   - add     : 写 capability_set_assets,扩展项目所在能力集的成员
+  //   - remove  : 删 capability_set_assets
   // CLI 端不再直接收 capability:* RPC,统一由 outbox-worker-v2 在下一次 reconcile
   // 中通过 reconcileProject 算出最新 plan 推下去。
 
@@ -635,9 +636,9 @@ export function projectRoutes(app: FastifyInstance) {
    * body: { assetIds: string[] }
    * 把若干 asset 作为「项目级直接成员」加入 project_capabilities → 触发 reconcile。
    *
-   * 单独安装（type 2）统一走此路径：per-project、不写入共享 workspace_assets、不 fan-out
-   * 到同 workspace 的其它项目。无论项目是否已装 workspace 都可追加。与工作空间装 / 本地
-   * 外部 adopt 在 reconcile 受管集中地位等同（受管集 = workspace_assets ∪ project_capabilities）。
+   * 单独安装（type 2）统一走此路径：per-project、不写入共享 capability_set_assets、不 fan-out
+   * 到同 capabilitySet 的其它项目。无论项目是否已装 capabilitySet 都可追加。与能力集装 / 本地
+   * 外部 adopt 在 reconcile 受管集中地位等同（受管集 = capability_set_assets ∪ project_capabilities）。
    */
   app.post("/api/projects/:id/capabilities/add", { preHandler: [requireAnyAuth] }, async (request, reply) => {
     const projectId = (request.params as any).id as string;
@@ -673,9 +674,9 @@ export function projectRoutes(app: FastifyInstance) {
   /**
    * POST /api/projects/:id/capabilities/remove
    * body: { assetId: string, tool?: TargetTool, externalAsset?: {...} }
-   * 从项目移除该能力：删 workspace_assets / project_capabilities 成员 + toggle 痕迹 → reconcile。
+   * 从项目移除该能力：删 capability_set_assets / project_capabilities 成员 + toggle 痕迹 → reconcile。
    *
-   * - 工作空间成员：从 workspace_assets 删（共享空间，fan-out 到同空间其它项目）。
+   * - 能力集成员：从 capability_set_assets 删（共享能力集，fan-out 到同能力集其它项目）。
    * - 本地 adopt 能力：从 project_capabilities 删（per-project，不扇出）。
    * - 外部能力（external:*）：先 adopt 再移除。
    * 移除的磁盘文件 / 聚合条目由 reconcile `removed` 清理（plan 自带文件路径，含从未入 lock
@@ -713,15 +714,15 @@ export function projectRoutes(app: FastifyInstance) {
       }
     }
 
-    // 1. 删成员：从所有引用该 asset 的已订阅工作空间的 workspace_assets 删（共享空间，
-    //    fan-out 到同空间其它项目）+ project_capabilities（若是 adopt / 单独添加能力）。
+    // 1. 删成员：从所有引用该 asset 的已订阅能力集的 capability_set_assets 删（共享能力集，
+    //    fan-out 到同能力集其它项目）+ project_capabilities（若是 adopt / 单独添加能力）。
     const inCapabilities = !!db
       .prepare("SELECT 1 FROM project_capabilities WHERE project_id = ? AND asset_id = ?")
       .get(projectId, assetId);
-    for (const wsId of proj.workspaceIds) {
+    for (const capabilitySetId of proj.capabilitySetIds) {
       db.prepare(
-        "DELETE FROM workspace_assets WHERE workspace_id = ? AND asset_id = ?",
-      ).run(wsId, assetId);
+        "DELETE FROM capability_set_assets WHERE capability_set_id = ? AND asset_id = ?",
+      ).run(capabilitySetId, assetId);
     }
     db.prepare(
       "DELETE FROM project_capabilities WHERE project_id = ? AND asset_id = ?",
@@ -731,15 +732,15 @@ export function projectRoutes(app: FastifyInstance) {
       "DELETE FROM project_disabled_assets WHERE project_id = ? AND asset_id = ?",
     ).run(projectId, assetId);
 
-    // 2. fan-out（工作空间成员变更）+ 等待 self。reconcile 落盘后磁盘文件 / 聚合 key 被删，
+    // 2. fan-out（能力集成员变更）+ 等待 self。reconcile 落盘后磁盘文件 / 聚合 key 被删，
     //    project_installed_assets 账本由 applySuccess 重写（removed 项被剔除）。
-    for (const wsId of proj.workspaceIds) {
-      syncWorkspaceMembersToProjects(wsId, [], [], false);
+    for (const capabilitySetId of proj.capabilitySetIds) {
+      syncCapabilitySetMembersToProjects(capabilitySetId, [], [], false);
     }
     const wait = await enqueueReconcileAndWait(proj.deviceId, projectId, { force: true });
     // 3. adopt 产物仅本项目引用 → reconcile 落盘后硬删 asset 行（CASCADE 清 asset_files）。
     //    此时 project_capabilities / project_disabled_assets 已删，project_installed_assets
-    //    由 applySuccess 清空该行，无 FK 残留引用。仅当确非共享 workspace 成员时才硬删。
+    //    由 applySuccess 清空该行，无 FK 残留引用。仅当确非共享 capabilitySet 成员时才硬删。
     //    注意：仅 adopted=1 的 adopt 产物可硬删——经 capabilities/add 加入的库 asset
     //    只是「从项目移除」，资产本身必须保留在库中（否则移除后无法再次添加）。
     if (inCapabilities && wait.kind !== "skip") {
@@ -747,7 +748,7 @@ export function projectRoutes(app: FastifyInstance) {
         | { adopted: number }
         | undefined;
       const stillReferenced = !!db
-        .prepare("SELECT 1 FROM workspace_assets WHERE asset_id = ?")
+        .prepare("SELECT 1 FROM capability_set_assets WHERE asset_id = ?")
         .get(assetId);
       if (assetRow?.adopted === 1 && !stillReferenced) {
         db.prepare("DELETE FROM project_installed_assets WHERE project_id = ? AND asset_id = ?")
@@ -762,8 +763,8 @@ export function projectRoutes(app: FastifyInstance) {
    * POST /api/projects/:id/targets
    * body: { targets: TargetTool[] }
    * 更新项目的「目标厂商集合」（default_targets）并立即 reconcile。用于安装后用户
-   * 新增 / 调整厂商：reconcileProject 按 default_targets ∩ workspace.targetTools 决定
-   * 落盘厂商，因此新增厂商即让对应 vendor 目录被创建并写入当前工作空间能力。
+   * 新增 / 调整厂商：reconcileProject 按 default_targets ∩ capabilitySet.targetTools 决定
+   * 落盘厂商，因此新增厂商即让对应 vendor 目录被创建并写入当前能力集能力。
    */
   app.post("/api/projects/:id/targets", { preHandler: [requireAnyAuth] }, async (request, reply) => {
     const projectId = (request.params as any).id as string;
@@ -811,8 +812,8 @@ function finalizeCapabilityResponse(
 
 interface CapabilityProjectCtx {
   deviceId: string;
-  /** 项目当前全部显式订阅的工作空间 id（含留存空间）。 */
-  workspaceIds: string[];
+  /** 项目当前全部显式订阅的能力集 id（含留存能力集）。 */
+  capabilitySetIds: string[];
   targetTools: TargetTool[];
   assets: import("@maolinc/cc-loom-shared").ManifestAssetEntry[];
 }
@@ -820,7 +821,7 @@ interface CapabilityProjectCtx {
 /**
  * 校验项目 + 加载 currentEnabledAssets 全集（用于 agent 端 mcp/hook aggregate 重算）。
  *
- * 注意：currentEnabledAssets 用 workspace.assets 近似 — 真实 enabled 列表只在 agent
+ * 注意：currentEnabledAssets 用 capabilitySet.assets 近似 — 真实 enabled 列表只在 agent
  * 端 lock 中。capabilities 流程下两边一致；偶发偏差由 agent 兜底（按自己 lock 取真值）。
  */
 async function loadProjectForCapability(
@@ -835,24 +836,24 @@ async function loadProjectForCapability(
     | undefined;
   if (!row || row.user_id !== userId) return { error: "项目不存在", status: 404 };
   if (!getAgent(row.device_id)) return { error: "Agent 未在线", status: 409 };
-  // 注意：不过滤 deleted_at —— 已从库移除但仍被本项目「留存」的工作空间，
+  // 注意：不过滤 deleted_at —— 已从库移除但仍被本项目「留存」的能力集，
   // 仍要能解析出 targetTools / assets，保证向已安装项目添加能力不受阻碍。
   const subs = db.prepare(
-    "SELECT workspace_id FROM project_subscriptions WHERE project_id = ? AND workspace_id != ''",
-  ).all(projectId) as { workspace_id: string }[];
-  const workspaceIds = subs.map((s) => s.workspace_id);
+    "SELECT capability_set_id FROM project_subscriptions WHERE project_id = ? AND capability_set_id != ''",
+  ).all(projectId) as { capability_set_id: string }[];
+  const capabilitySetIds = subs.map((s) => s.capability_set_id);
   let assets: import("@maolinc/cc-loom-shared").ManifestAssetEntry[] = [];
   const targetTools = new Set<TargetTool>();
   const assetIds = new Set<string>();
-  for (const wsId of workspaceIds) {
-    const ws = db.prepare(
-      "SELECT id, target_tools FROM workspaces WHERE id = ?",
-    ).get(wsId) as { id: string; target_tools: string } | undefined;
-    if (!ws) continue;
-    for (const t of JSON.parse(ws.target_tools || "[]") as TargetTool[]) targetTools.add(t);
+  for (const capabilitySetId of capabilitySetIds) {
+    const capabilitySet = db.prepare(
+      "SELECT id, target_tools FROM capability_sets WHERE id = ?",
+    ).get(capabilitySetId) as { id: string; target_tools: string } | undefined;
+    if (!capabilitySet) continue;
+    for (const t of JSON.parse(capabilitySet.target_tools || "[]") as TargetTool[]) targetTools.add(t);
     const wa = db
-      .prepare("SELECT asset_id FROM workspace_assets WHERE workspace_id = ?")
-      .all(ws.id) as { asset_id: string }[];
+      .prepare("SELECT asset_id FROM capability_set_assets WHERE capability_set_id = ?")
+      .all(capabilitySet.id) as { asset_id: string }[];
     for (const r of wa) assetIds.add(r.asset_id);
   }
   if (assetIds.size > 0) {
@@ -861,7 +862,7 @@ async function loadProjectForCapability(
   }
   return {
     deviceId: row.device_id,
-    workspaceIds,
+    capabilitySetIds,
     targetTools: [...targetTools],
     assets,
   };
@@ -872,7 +873,7 @@ async function loadProjectForCapability(
  * project_installed_assets，使其进入 reconcile 受管集。返回新 assetId。失败抛 Error。
  *
  * 触发场景：本地控制台对 `external:<type>:<name>` 能力做 toggle/remove。adopt 后该能力
- * 与工作空间装 / 单独装能力在 reconcile 中地位等同——三类能力控制行为一致的关键。
+ * 与能力集装 / 单独装能力在 reconcile 中地位等同——三类能力控制行为一致的关键。
  *
  * 全类型支持：
  *  - mcp：从聚合文件 { mcpServers: { <name>: <def> } } 抽取单 server def（single 形态）。

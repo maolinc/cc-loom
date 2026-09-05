@@ -1,5 +1,5 @@
 /**
- * `~/.loom/locks/<project-id>.json` —— 项目当前安装的 Workspace 锁。
+ * `~/.loom/locks/<project-id>.json` —— 项目当前安装的 CapabilitySet 锁。
  *
  * 字段直接复用 `LockFile`（@maolinc/cc-loom-shared）。两种历史形态：
  *
@@ -10,14 +10,65 @@
  *
  * 写入永远使用 per-asset；读取兼容两种。`isLegacyLock` 暴露给上层做判定。
  */
-import type { AssetType, LockAssetEntry, LockFile, LockVendorState, ManifestAssetEntry, TargetTool } from "@maolinc/cc-loom-shared";
+import type {
+  AssetType,
+  CapabilitySetSubscription,
+  LockAssetEntry,
+  LockFile,
+  LockVendorState,
+  ManifestAssetEntry,
+  SyncPolicy,
+  TargetTool,
+} from "@maolinc/cc-loom-shared";
 import { lockFile, ensureLoomDirs } from "./paths.js";
 import { readJson, writeJsonAtomic, removeIfExists } from "./atomic.js";
 
 export const LOCK_PLAN_KEY = "__plan__";
 
+type PersistedSubscription = Omit<CapabilitySetSubscription, "capabilitySetId"> & {
+  capabilitySetId?: string | null;
+  workspaceId?: string | null;
+  workspaceName?: string | null;
+};
+
+type PersistedLock = Omit<Partial<LockFile>, "subscriptions"> & Pick<LockFile, "assets" | "version"> & {
+  capabilitySetId?: string | null;
+  workspaceId?: string | null;
+  policy?: SyncPolicy;
+  subscriptions?: PersistedSubscription[];
+};
+
 export function readLock(projectId: string): LockFile | null {
-  return readJson<LockFile>(lockFile(projectId));
+  const raw = readJson<PersistedLock>(lockFile(projectId));
+  if (!raw) return null;
+
+  // Capability Set rename migration. Old lock keys are accepted only here;
+  // every subsequent reconcile writes the canonical capabilitySet* shape.
+  const legacyCapabilitySetId = raw.capabilitySetId ?? raw.workspaceId ?? null;
+  if (Array.isArray(raw.subscriptions)) {
+    raw.subscriptions = raw.subscriptions.map((subscription) => {
+      const { workspaceId, workspaceName, ...canonical } = subscription;
+      return {
+        ...canonical,
+        capabilitySetId: subscription.capabilitySetId ?? workspaceId ?? null,
+        capabilitySetName: subscription.capabilitySetName ?? workspaceName ?? null,
+      };
+    });
+  } else {
+    raw.subscriptions = legacyCapabilitySetId
+      ? [{
+          capabilitySetId: legacyCapabilitySetId,
+          capabilitySetName: null,
+          syncPolicy: raw.policy === "locked" ? "locked" : "auto",
+          targetTools: null,
+          installedAt: "",
+        }]
+      : [];
+  }
+  delete raw.capabilitySetId;
+  delete raw.workspaceId;
+  delete raw.policy;
+  return raw as LockFile;
 }
 
 export function writeLock(projectId: string, lock: LockFile): void {

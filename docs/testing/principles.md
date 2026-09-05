@@ -123,7 +123,7 @@ L3 是整个体系的核心——它测的是**真实的系统行为**，不是 
     │      → agent 回传 InstallResult               ← 真实结果回传
     │
     └─ 6. expectFileExists(root, ".cursor/skills/scout/SKILL.md")
-           expectLock(projectId, { workspaceId, policy })
+           expectLock(projectId, { capabilitySetId, policy })
                                               ← 断言真实磁盘 + 真实 lock 文件
 ```
 
@@ -146,13 +146,13 @@ L3 测的是"单角色单流程"，L4 测的是"多角色多状态"。
   用户 A (alice)                    用户 B (bob)
       │                                 │
       │ 创建 skill-a + skill-b          │
-      │ 创建 workspace (含 skill-a)     │
+      │ 创建 能力集 (含 skill-a)     │
       │                                 │
       │                                 │ 注册项目 + 启动 agent
-      │                                 │ 安装 workspace (auto)
+      │                                 │ 安装 能力集 (auto)
       │                                 │ ←磁盘: skill-a ✓, skill-b ✗
       │                                 │
-      │ 更新 workspace (+skill-b)       │
+      │ 更新 能力集 (+skill-b)       │
       │                                 │ ← auto 同步触发
       │                                 │ ←磁盘: skill-a ✓, skill-b ✓
       │                                 │
@@ -226,7 +226,7 @@ Dockerfile.test-base (node:22-slim + 工具链 + Playwright 依赖)
 | 正向 | happy-path: 安装后磁盘文件 + lock 一致 | `expectFileSet(root, [".cursor/..."])` |
 | 负向 | error-path: 错误密码 → 401 + "密码" | `expect(status).toBe(401)` + `expect(error).toContain("密码")` |
 | 边界 | boundary: >1MB content 能创建+安装 | `expect(written.length).toBe(big.length)` |
-| 并发 | concurrency: 并发创建同名 workspace | 1 fulfilled + 1 rejected(409) |
+| 并发 | concurrency: 并发创建同名 能力集 | 1 fulfilled + 1 rejected(409) |
 | 一致性 | drift: 删全部文件 → agent 重连 → lock 自动清 | `expectNoLock(projectId)` |
 
 **禁止的做法**：
@@ -280,7 +280,7 @@ node runner.js --all --mode single
 | 层 | 文件数 | 用例数 | 场景覆盖 |
 |----|--------|--------|----------|
 | L1 | 6+ | — | 单元：adapter 路径/install-key/merge/mcp、reconcile-plan、cli scanner 等（`pnpm test`） |
-| L3 | 28 | ~146 | 真实链路：auth/settings/workspaces/marketplaces/push/full-flow/edit-protection/env-vars/install-plan/auto-sync/retention/outbox/sync-outbox + happy/drift/lifecycle/security/conflict/boundary/token |
+| L3 | 28 | ~146 | 真实链路：auth/settings/capability-sets/marketplaces/push/full-flow/edit-protection/env-vars/install-plan/auto-sync/retention/outbox/sync-outbox + happy/drift/lifecycle/security/conflict/boundary/token |
 | L4 | 3 | 3 | 流程编排：跨用户同步 / 离线补偿 / 多项目多工具 |
 | L5 | 2 | 5 | Playwright UI：登录 / 导航 |
 

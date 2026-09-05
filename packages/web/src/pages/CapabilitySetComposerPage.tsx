@@ -4,13 +4,13 @@ import { ArrowLeft } from "lucide-react";
 import { api } from "../api.js";
 import type { Asset, TargetTool, Visibility } from "@maolinc/cc-loom-shared";
 import AssetBrowser from "../components/AssetBrowser.js";
-import WorkspaceCanvas from "../components/WorkspaceCanvas.js";
+import CapabilitySetCanvas from "../components/CapabilitySetCanvas.js";
 import DetailPanel from "../components/DetailPanel.js";
 import Button from "../components/Button.js";
 import { ErrorState, InlineLoading } from "../components/PageState.js";
 import { useToast } from "../components/Toast.js";
 
-export default function WorkspaceComposerPage() {
+export default function CapabilitySetComposerPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
@@ -35,11 +35,11 @@ export default function WorkspaceComposerPage() {
   const [loadingWs, setLoadingWs] = useState(isEdit);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const loadWorkspace = (signal?: AbortSignal) => {
+  const loadCapabilitySet = (signal?: AbortSignal) => {
     if (!isEdit) return;
     setLoadingWs(true);
     setLoadError(null);
-    api.get<any>(`/workspaces/${id}`, signal).then((res) => {
+    api.get<any>(`/capability-sets/${id}`, signal).then((res) => {
       if (signal?.aborted) return;
       setLoadingWs(false);
       if (res.success && res.data) {
@@ -50,14 +50,14 @@ export default function WorkspaceComposerPage() {
         setVisibility(d.visibility);
         setSelected((d.assets || []).map((a: any) => a.asset ?? a));
       } else {
-        setLoadError(res.error || "无法加载工作空间");
+        setLoadError(res.error || "无法加载能力集");
       }
     });
   };
 
   useEffect(() => {
     const controller = new AbortController();
-    loadWorkspace(controller.signal);
+    loadCapabilitySet(controller.signal);
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isEdit]);
@@ -96,11 +96,11 @@ export default function WorkspaceComposerPage() {
     setError("");
 
     const body = { name, description, targetTools, visibility, assetIds: selectedIds };
-    const res = isEdit ? await api.put(`/workspaces/${id}`, body) : await api.post("/workspaces", body);
+    const res = isEdit ? await api.put(`/capability-sets/${id}`, body) : await api.post("/capability-sets", body);
     setSaving(false);
     if (res.success) {
-      toast.success(isEdit ? "工作空间已更新" : "工作空间已创建", name);
-      navigate("/workspaces");
+      toast.success(isEdit ? "能力集已更新" : "能力集已创建", name);
+      navigate("/capability-sets");
     } else {
       setError(res.error || "保存失败");
       toast.error("保存失败", res.error || "请稍后重试");
@@ -108,10 +108,10 @@ export default function WorkspaceComposerPage() {
   };
 
   if (isEdit && loadingWs) {
-    return <div className="h-[calc(100vh-8rem)]"><InlineLoading label="加载工作空间…" /></div>;
+    return <div className="h-[calc(100vh-8rem)]"><InlineLoading label="加载能力集…" /></div>;
   }
   if (isEdit && loadError) {
-    return <ErrorState message={loadError} onRetry={loadWorkspace} />;
+    return <ErrorState message={loadError} onRetry={loadCapabilitySet} />;
   }
 
   return (
@@ -137,18 +137,18 @@ export default function WorkspaceComposerPage() {
       {/* Right: Canvas */}
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex items-center justify-between px-6 py-3 border-b border-surface-sunken bg-white">
-          <Button variant="ghost" size="sm" leftIcon={<ArrowLeft size={15} />} onClick={() => navigate("/workspaces")}>
+          <Button variant="ghost" size="sm" leftIcon={<ArrowLeft size={15} />} onClick={() => navigate("/capability-sets")}>
             返回列表
           </Button>
           <div className="flex items-center gap-3">
             {error && <span className="text-sm text-red-500">{error}</span>}
             <Button variant="primary" loading={saving} onClick={handleSave}>
-              {isEdit ? "保存修改" : "创建工作空间"}
+              {isEdit ? "保存修改" : "创建能力集"}
             </Button>
           </div>
         </div>
 
-        <WorkspaceCanvas
+        <CapabilitySetCanvas
           name={name}
           onNameChange={setName}
           description={description}

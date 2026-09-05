@@ -2,13 +2,13 @@
  * L4 编排: 跨用户 auto 同步
  *
  * 角色:
- * - 用户 A (alice): 创建 public workspace, 含 1 个 skill
- * - 用户 B (bob): 安装 A 的 workspace (auto 策略)
+ * - 用户 A (alice): 创建 public capabilitySet, 含 1 个 skill
+ * - 用户 B (bob): 安装 A 的 capabilitySet (auto 策略)
  *
  * 流程:
- * 1. A 创建 skill + workspace (public)
+ * 1. A 创建 skill + capabilitySet (public)
  * 2. B 注册项目 + 启动 agent + 安装
- * 3. A 更新 workspace 成员 +1 skill
+ * 3. A 更新 capabilitySet 成员 +1 skill
  * 4. B 的项目自动同步新 skill（auto 策略）
  *
  * 不变量: B 的磁盘最终出现 2 个 skill 文件
@@ -47,7 +47,7 @@ describe("L4 cross-user-sync: 跨用户 auto 同步", () => {
     if (bobProject) cleanupProject(bobProject);
   });
 
-  it("A 创建 workspace → B 安装 → A 加成员 → B 自动同步", async () => {
+  it("A 创建 capabilitySet → B 安装 → A 加成员 → B 自动同步", async () => {
     server = await startServer();
 
     // ---- 角色 A: alice ----
@@ -57,7 +57,7 @@ describe("L4 cross-user-sync: 跨用户 auto 同步", () => {
 
     const skillA = await alice.createAsset(assetBuilders.skill("shared-a", ["cursor"]));
     const skillB = await alice.createAsset(assetBuilders.skill("shared-b", ["cursor"]));
-    const ws = await alice.createWorkspace(
+    const ws = await alice.createCapabilitySet(
       { name: "shared-ws", description: "cross-user", targetTools: ["cursor"], visibility: "public" },
       [skillA.id],
     );
@@ -78,10 +78,10 @@ describe("L4 cross-user-sync: 跨用户 auto 同步", () => {
       },
     });
 
-    // B 安装 A 的 public workspace
+    // B 安装 A 的 public capabilitySet
     await bob.installExecute({
       projectId: bobAgent.projectId,
-      workspaceId: ws.id,
+      capabilitySetId: ws.id,
       targetTools: ["cursor"],
       policy: "auto",
     });
@@ -90,8 +90,8 @@ describe("L4 cross-user-sync: 跨用户 auto 同步", () => {
     expect(existsSync(join(bobProject, ".cursor/skills/shared-a/SKILL.md"))).toBe(true);
     expect(existsSync(join(bobProject, ".cursor/skills/shared-b/SKILL.md"))).toBe(false);
 
-    // ---- A 更新 workspace: 加 skillB ----
-    await alice.updateWorkspace(ws.id, { assetIds: [skillA.id, skillB.id] });
+    // ---- A 更新 capabilitySet: 加 skillB ----
+    await alice.updateCapabilitySet(ws.id, { assetIds: [skillA.id, skillB.id] });
 
     // ---- 等待 B 自动同步 ----
     let synced = false;

@@ -36,9 +36,9 @@
 - 用户/认证：`User`、`UserSession`、`CliToken`、`Device`。
 - 设备工具配置：`ToolConfigProfile`、`CodexToolConfig`、`ClaudeCodeToolConfig`、`ToolConfigDistribution`、`WsToolConfigApplyPayload`。
 - 能力：`Asset`、`AssetFile`、`AssetCreateInput`、`AssetUpdateInput`、`AssetMetadata`。
-- 工作空间：`Workspace`、`WorkspaceAsset`、`WorkspaceCreateInput`、`WorkspaceUpdateInput`。
+- 能力集：`CapabilitySet`、`CapabilitySetAsset`、`CapabilitySetCreateInput`、`CapabilitySetUpdateInput`。
 - 安装：`Manifest`、`ManifestAssetEntry`、`InstallPlan`、`DiffEntry`、`InstallResult`、`InstallConflict`（同名撞车裁决）。
-- 订阅：`WorkspaceSubscription`（ADR-0006 多空间订阅；`workspaceId=null` 为隐式订阅）。
+- 订阅：`CapabilitySetSubscription`（ADR-0006 多能力集订阅；`capabilitySetId=null` 为隐式订阅）。
 - 本地镜像：`Project`、`LocalProjectState`、`VendorMirror`、`LocalFileNode`、`AssetCapability`。
 - Lock：`LockFile`、`LockAssetEntry`、`LockVendorState`、`LockAggregateEntry`。
 - Marketplace：`MarketplaceSource`、`MarketplaceSyncLog`、`ImportedAsset`、`ImportedPlugin`。
@@ -52,10 +52,10 @@ skill 调用统计相关字段：`Asset.invocationCount`（市场总数）、`As
 `packages/shared/src/schemas.ts` 是 API 入参校验的公共来源：
 
 - `assetCreateSchema` / `assetUpdateSchema`
-- `workspaceCreateSchema` / `workspaceUpdateSchema`
+- `capabilitySetCreateSchema` / `capabilitySetUpdateSchema`
 - `projectRegisterSchema`
 - `installRequestSchema`
-- `assetSearchSchema` / `workspaceSearchSchema`
+- `assetSearchSchema` / `capabilitySetSearchSchema`
 - `marketplaceCreateSchema` / `marketplaceDeleteQuerySchema`
 - `settingsUpdateSchema`
 
@@ -111,7 +111,7 @@ Server 构建 `ManifestAssetEntry` 时必须透传 `sourcePath`，否则 marketp
 | `claudecode.ts` | Claude Code 适配，支持全 6 类，MCP 写项目根 `.mcp.json` |
 | `registry.ts` | adapter 实例注册，提供 `getAdapter()` / `getAdapters()` / `listAdapters()` |
 | `merge.ts` | 合并策略：hooks、settings hooks、mcpServers |
-| `install-key.ts` | 落盘身份判重坐标，用于 workspace 冲突检测 |
+| `install-key.ts` | 落盘身份判重坐标，用于 能力集 冲突检测 |
 | `diff.ts` | diff 相关工具 |
 
 ### Adapter 输出规则
@@ -157,4 +157,4 @@ CLI installer 在 `merge` 操作中调用 `mergeContent()`，不要在 server �
 - `mcp`：按 server key 判重，wrapped content 可产生多个 key。
 - `hook`：只按附属目录名判重，`(tool, hook-dir, normalize(name))`。
 
-Server 在 workspace 创建/更新、隐式 workspace / 单项能力加入时用它拦截会互相覆盖的能力组合。
+Server 在 能力集 创建/更新、隐式 能力集 / 单项能力加入时用它拦截会互相覆盖的能力组合。

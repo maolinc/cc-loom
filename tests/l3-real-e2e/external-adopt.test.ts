@@ -170,9 +170,9 @@ describe("L3 external-adopt: 本地外部 MCP 能力 toggle / remove（merge-pre
     expect(Object.keys(servers)).toEqual(["other"]);
   });
 
-  it("无 workspace 项目：磁盘外部 skill 在 /state 标记 external + files 完整，前端派生 payload 可 toggle off", async () => {
+  it("无 capabilitySet 项目：磁盘外部 skill 在 /state 标记 external + files 完整，前端派生 payload 可 toggle off", async () => {
     await setup();
-    // 无 workspace：手写一个外部 skill 目录
+    // 无 capabilitySet：手写一个外部 skill 目录
     mkdirSync(join(projectRoot!, ".claude/skills/scout"), { recursive: true });
     writeFileSync(join(projectRoot!, ".claude/skills/scout/SKILL.md"), "# scout");
 
@@ -180,7 +180,7 @@ describe("L3 external-adopt: 本地外部 MCP 能力 toggle / remove（merge-pre
     const state = await api.scanState(agent!.projectId);
     const cap = state.capabilities?.find((c) => c.assetId === "external:skill:scout");
     expect(cap).toBeTruthy();
-    // 契约：无 workspace 的磁盘能力必须标记 external，且 files 完整——前端据此派生 adopt 信息
+    // 契约：无 capabilitySet 的磁盘能力必须标记 external，且 files 完整——前端据此派生 adopt 信息
     expect(cap!.external).toBe(true);
     expect(cap!.vendors.claudecode?.files ?? []).toContain(".claude/skills/scout/SKILL.md");
 

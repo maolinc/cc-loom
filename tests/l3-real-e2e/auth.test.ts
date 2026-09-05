@@ -36,7 +36,7 @@ describe("L3 auth", () => {
       body: JSON.stringify({ email: "weak@example.com", password: "short" }),
     });
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toContain("12");
+    expect((await res.json()).error).toContain("6");
   });
 
   it("rejects login with wrong password on existing account", async () => {

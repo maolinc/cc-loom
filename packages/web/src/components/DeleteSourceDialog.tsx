@@ -4,7 +4,7 @@ import { useToast } from "./Toast.js";
 import ConfirmDialog from "./ConfirmDialog.js";
 
 interface Props {
-  source: { id: string; displayName: string; assetCount: number; workspaceCount: number };
+  source: { id: string; displayName: string; assetCount: number; capabilitySetCount: number };
   onClose: () => void;
   onRemoved: () => void;
 }
@@ -37,9 +37,9 @@ export default function DeleteSourceDialog({ source, onClose, onRemoved }: Props
       description={
         <>
           该来源下有 <span className="font-medium text-text-primary">{source.assetCount}</span> 个能力
-          {source.workspaceCount > 0 && (
+          {source.capabilitySetCount > 0 && (
             <>
-              、<span className="font-medium text-text-primary">{source.workspaceCount}</span> 个工作空间
+              、<span className="font-medium text-text-primary">{source.capabilitySetCount}</span> 个能力集
             </>
           )}
           。

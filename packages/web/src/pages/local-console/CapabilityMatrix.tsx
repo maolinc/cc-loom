@@ -10,8 +10,8 @@
  *   - 未在 lock（其它能力安装到了别的 vendor，本 vendor 不在 defaultTargets）→ "—"
  *
  * 类型筛选：全部 / SKILL / RULE / MCP / HOOK / COMMAND / AGENT。计数实时显示。
- * 来源筛选（ADR-0006）：全部 / 各订阅空间 / 单独添加，按 cap.sources 过滤；
- * 名称格内在别名后渲染来源徽标（多个 = 共享能力，workspaceId=null →「单独添加」）。
+ * 来源筛选（ADR-0006）：全部 / 各订阅能力集 / 单独添加，按 cap.sources 过滤；
+ * 名称格内在别名后渲染来源徽标（多个 = 共享能力，capabilitySetId=null →「单独添加」）。
  */
 import { useMemo, useState } from "react";
 import { ADAPTER_SUPPORT, ASSET_TYPES, TARGET_TOOLS, TARGET_TOOL_LABELS } from "@maolinc/cc-loom-shared";
@@ -25,15 +25,15 @@ import { MoreHorizontal, Search, Slash, Activity } from "lucide-react";
 import { CountIndicator } from "./_vendorBadge.js";
 import ToolIcon from "../../components/ToolIcon.js";
 
-/** 「来源空间」过滤器的选项；workspaceId=null 表示「单独添加」（隐式订阅）。 */
+/** 「来源能力集」过滤器的选项；capabilitySetId=null 表示「单独添加」（隐式订阅）。 */
 export interface CapabilitySourceOption {
-  workspaceId: string | null;
+  capabilitySetId: string | null;
   name: string;
 }
 
 /** 过滤器内部 key：null 来源用 "implicit" 占位（避免与 "all" 混淆）。 */
 const IMPLICIT_SOURCE_KEY = "implicit";
-const sourceKey = (workspaceId: string | null) => workspaceId ?? IMPLICIT_SOURCE_KEY;
+const sourceKey = (capabilitySetId: string | null) => capabilitySetId ?? IMPLICIT_SOURCE_KEY;
 
 interface Props {
   capabilities: AssetCapability[];
@@ -42,7 +42,7 @@ interface Props {
   assetAliases?: Map<string, string>;
   /** assetId → 描述（hover 提示，取创建能力时的描述）。 */
   assetDescriptions?: Map<string, string>;
-  /** 「来源空间」过滤器选项（项目的订阅集合，含「单独添加」）。 */
+  /** 「来源能力集」过滤器选项（项目的订阅集合，含「单独添加」）。 */
   sourceOptions?: CapabilitySourceOption[];
   onToggle: (assetId: string, tool: TargetTool, enabled: boolean) => void;
   onRemove: (assetId: string) => void;
@@ -95,16 +95,16 @@ export default function CapabilityMatrix({
     const acc = new Map<string, number>();
     for (const c of capabilities) {
       for (const s of c.sources ?? []) {
-        const key = sourceKey(s.workspaceId);
+        const key = sourceKey(s.capabilitySetId);
         acc.set(key, (acc.get(key) ?? 0) + 1);
       }
     }
     return acc;
   }, [capabilities]);
 
-  // 「来源空间」过滤器只展示实际出现过的来源
+  // 「来源能力集」过滤器只展示实际出现过的来源
   const visibleSources = useMemo(
-    () => (sourceOptions ?? []).filter((o) => (sourceCounts.get(sourceKey(o.workspaceId)) ?? 0) > 0),
+    () => (sourceOptions ?? []).filter((o) => (sourceCounts.get(sourceKey(o.capabilitySetId)) ?? 0) > 0),
     [sourceOptions, sourceCounts],
   );
 
@@ -114,8 +114,8 @@ export default function CapabilityMatrix({
     return capabilities.filter((c) => {
       if (filter !== "all" && c.type !== filter) return false;
       if (sourceFilter !== "all") {
-        const wid = sourceFilter === IMPLICIT_SOURCE_KEY ? null : sourceFilter;
-        if (!(c.sources ?? []).some((s) => s.workspaceId === wid)) return false;
+        const capabilitySetId = sourceFilter === IMPLICIT_SOURCE_KEY ? null : sourceFilter;
+        if (!(c.sources ?? []).some((s) => s.capabilitySetId === capabilitySetId)) return false;
       }
       if (q && !c.name.toLowerCase().includes(q)) return false;
       return true;
@@ -144,9 +144,9 @@ export default function CapabilityMatrix({
             ))}
           </div>
           {visibleSources.length > 0 && (
-            <div role="toolbar" aria-label="来源空间筛选" className="flex items-center gap-1.5 flex-wrap">
+            <div role="toolbar" aria-label="来源能力集筛选" className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[10.5px] font-semibold tracking-wide text-text-muted uppercase mr-1">
-                来源空间
+                来源能力集
               </span>
               <FilterChip
                 label="全部"
@@ -156,11 +156,11 @@ export default function CapabilityMatrix({
               />
               {visibleSources.map((o) => (
                 <FilterChip
-                  key={sourceKey(o.workspaceId)}
-                  label={o.workspaceId === null ? "单独添加" : o.name}
-                  count={sourceCounts.get(sourceKey(o.workspaceId)) ?? 0}
-                  active={sourceFilter === sourceKey(o.workspaceId)}
-                  onClick={() => setSourceFilter(sourceKey(o.workspaceId))}
+                  key={sourceKey(o.capabilitySetId)}
+                  label={o.capabilitySetId === null ? "单独添加" : o.name}
+                  count={sourceCounts.get(sourceKey(o.capabilitySetId)) ?? 0}
+                  active={sourceFilter === sourceKey(o.capabilitySetId)}
+                  onClick={() => setSourceFilter(sourceKey(o.capabilitySetId))}
                 />
               ))}
             </div>
@@ -391,24 +391,24 @@ function HookEventChips({ events }: { events: string[] }) {
 }
 
 // ────────────────────────────────────────────
-// 来源空间徽标（ADR-0006）：多个 = 共享能力；workspaceId=null →「单独添加」
+// 来源能力集徽标（ADR-0006）：多个 = 共享能力；capabilitySetId=null →「单独添加」
 // ────────────────────────────────────────────
-function SourceBadges({ sources }: { sources: { workspaceId: string | null; name: string }[] }) {
+function SourceBadges({ sources }: { sources: { capabilitySetId: string | null; name: string }[] }) {
   return (
     <span
       className="inline-flex items-center gap-1 flex-wrap"
-      title={`来源：${sources.map((s) => (s.workspaceId === null ? "单独添加" : s.name)).join("、")}`}
+      title={`来源：${sources.map((s) => (s.capabilitySetId === null ? "单独添加" : s.name)).join("、")}`}
     >
       {sources.map((s) => (
         <span
-          key={s.workspaceId ?? "implicit"}
+          key={s.capabilitySetId ?? "implicit"}
           className={`text-[9.5px] font-medium px-1 py-px rounded border ${
-            s.workspaceId === null
+            s.capabilitySetId === null
               ? "bg-surface-card text-text-muted border-gray-200"
               : "bg-brand-soft/50 text-brand border-brand/15"
           }`}
         >
-          {s.workspaceId === null ? "单独添加" : s.name}
+          {s.capabilitySetId === null ? "单独添加" : s.name}
         </span>
       ))}
     </span>

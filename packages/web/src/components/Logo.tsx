@@ -1,7 +1,7 @@
 /**
  * Loom 品牌 mark —— 三根经线 + 一根流动纬线，中间经线压在纬线之上，
  * 形成 over-under-over 的编织效果，呼应产品名 "Loom"（织机）：
- * 把分散的 AI 能力（skill / rule / mcp / hook / command / agent）编织成统一工作空间。
+ * 把分散的 AI 能力（skill / rule / mcp / hook / command / agent）编织成统一能力集。
  *
  * 仅渲染 mark 本体（不含底色方块）；由调用方用 `<span class="bg-brand ...">` 包裹提供 chip。
  */

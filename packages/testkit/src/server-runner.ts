@@ -62,7 +62,7 @@ export async function startServer(opts?: { port?: number; adminEmail?: string; a
   const port = opts?.port ?? await findFreePort();
   const baseUrl = `http://127.0.0.1:${port}`;
   // 每个 server 进程独占一个临时 LOOM_DATA_DIR，确保用例间 DB 完全隔离
-  // （容器内 LOOM_DATA_DIR 是共享的；不覆盖则会串号/串 workspace 名）。
+  // （容器内 LOOM_DATA_DIR 是共享的；不覆盖则会串号/串能力集名）。
   const dataDir = mkdtempSync(join(tmpdir(), "loom-server-"));
   const proc = spawn("node", [SERVER_BIN], {
     env: {

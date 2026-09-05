@@ -1,9 +1,9 @@
 /**
- * L3 Edit-protection — 导入资产/工作空间可被导入者编辑，破坏性操作受保护。
+ * L3 Edit-protection — 导入资产/能力集可被导入者编辑，破坏性操作受保护。
  *
  * 真实 server + 真实 git clone（generic-skills / cc-plugin fixture）。
  * 不变量: 导入资产 PUT 200 / DELETE 403、用户资产 PUT/DELETE 200、跨用户 403、
- *         别名/改名/元数据保留、plugin workspace PUT 200 / DELETE 403。
+ *         别名/改名/元数据保留、plugin capabilitySet PUT 200 / DELETE 403。
  */
 import { describe, it, expect, afterEach } from "vitest";
 import type { TargetTool } from "@maolinc/cc-loom-shared";
@@ -154,7 +154,7 @@ describe("L3 edit-protection", () => {
       expect(create.status).toBe(200);
       const assetId = (await parseJson<any>(create)).data.id;
 
-      const ws = await request(server.baseUrl, "POST", "/api/workspaces", { cookie: c, body: { name: "rename-ws", description: "x", targetTools: ["cursor"], visibility: "private", assetIds: [assetId] } });
+      const ws = await request(server.baseUrl, "POST", "/api/capability-sets", { cookie: c, body: { name: "rename-ws", description: "x", targetTools: ["cursor"], visibility: "private", assetIds: [assetId] } });
       expect(ws.status).toBe(200);
 
       const rename = await request(server.baseUrl, "PUT", `/api/assets/${assetId}`, { cookie: c, body: { name: "new_stable_name" } });
@@ -188,40 +188,40 @@ describe("L3 edit-protection", () => {
     });
   });
 
-  describe("Workspace", () => {
-    async function importPluginAndGetWorkspace(): Promise<string> {
+  describe("CapabilitySet", () => {
+    async function importPluginAndGetCapabilitySet(): Promise<string> {
       // 切到 cc-plugin fixture
       fx?.dispose();
       fx = createGitFixture(FIXTURE_CC_PLUGIN);
       await api.addMarketplace(fx.url);
-      const wss = await api.listWorkspaces();
+      const wss = await api.listCapabilitySets();
       const plugin = wss.find((w) => w.name === "example-plugin")!;
       expect(plugin).toBeDefined();
       return plugin.id;
     }
 
-    it("PUT on plugin-derived workspace by importer returns 200", async () => {
+    it("PUT on plugin-derived capabilitySet by importer returns 200", async () => {
       await boot();
-      const wsId = await importPluginAndGetWorkspace();
-      const res = await request(server.baseUrl, "PUT", `/api/workspaces/${wsId}`, { cookie, body: { description: "edited imported workspace" } });
+      const wsId = await importPluginAndGetCapabilitySet();
+      const res = await request(server.baseUrl, "PUT", `/api/capability-sets/${wsId}`, { cookie, body: { description: "edited imported capabilitySet" } });
       expect(res.status).toBe(200);
-      expect((await parseJson<any>(res)).data.description).toBe("edited imported workspace");
+      expect((await parseJson<any>(res)).data.description).toBe("edited imported capabilitySet");
     });
 
-    it("DELETE on plugin-derived workspace returns 403", async () => {
+    it("DELETE on plugin-derived capabilitySet returns 403", async () => {
       await boot();
-      const wsId = await importPluginAndGetWorkspace();
-      const res = await request(server.baseUrl, "DELETE", `/api/workspaces/${wsId}`, { cookie });
+      const wsId = await importPluginAndGetCapabilitySet();
+      const res = await request(server.baseUrl, "DELETE", `/api/capability-sets/${wsId}`, { cookie });
       expect(res.status).toBe(403);
       expect((await parseJson<any>(res)).error).toContain("只读");
     });
 
-    it("PUT on user-created workspace works (control)", async () => {
+    it("PUT on user-created capabilitySet works (control)", async () => {
       await boot();
-      const create = await request(server.baseUrl, "POST", "/api/workspaces", { cookie, body: { name: "my-ws", description: "manual", targetTools: ["cursor"], visibility: "private" } });
+      const create = await request(server.baseUrl, "POST", "/api/capability-sets", { cookie, body: { name: "my-ws", description: "manual", targetTools: ["cursor"], visibility: "private" } });
       expect(create.status).toBe(200);
       const wsId = (await parseJson<any>(create)).data.id;
-      const update = await request(server.baseUrl, "PUT", `/api/workspaces/${wsId}`, { cookie, body: { description: "updated" } });
+      const update = await request(server.baseUrl, "PUT", `/api/capability-sets/${wsId}`, { cookie, body: { description: "updated" } });
       expect(update.status).toBe(200);
     });
   });

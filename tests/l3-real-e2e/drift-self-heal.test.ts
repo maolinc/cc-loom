@@ -4,7 +4,7 @@
  *
  * 不变量（产品文档 §8）:
  * - lock 中 expected 文件全部消失 → Agent scan 自动清 lock (driftCleared)
- * - server 同步清空 current workspace
+ * - server 同步清空 current capabilitySet
  *
  * 策略: 安装 → 停 agent → 删文件 → 重启 agent → scan 检测 drift → 清 lock。
  * 不依赖 watcher（串行跑时 watcher 可能未就绪），用 agent 重连的 reconcile 触发 scan。
@@ -47,14 +47,14 @@ describe("L3 drift-self-heal: lock 文件全缺 → agent 重连后自动清 loc
     if (projectRoot) cleanupProject(projectRoot);
   });
 
-  it("安装→停agent→删文件→重启agent→lock 被清 + server currentWorkspace 置空", async () => {
+  it("安装→停agent→删文件→重启agent→lock 被清 + server currentCapabilitySet 置空", async () => {
     server = await startServer();
     api = new ApiClient(server.baseUrl);
     await api.login("drift@example.com");
     const token = await api.getCliToken();
 
     const skill = await api.createAsset(assetBuilders.skill("drift-skill", ["cursor"]));
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "ws-drift", description: "drift test", targetTools: ["cursor"], visibility: "public" },
       [skill.id],
     );
@@ -75,7 +75,7 @@ describe("L3 drift-self-heal: lock 文件全缺 → agent 重连后自动清 loc
     // agent scan 才能检测到 drift 并清 lock）
     const { result } = await api.installExecute({
       projectId,
-      workspaceId: ws.id,
+      capabilitySetId: ws.id,
       targetTools: ["cursor"],
       policy: "locked",
     });
@@ -100,7 +100,7 @@ describe("L3 drift-self-heal: lock 文件全缺 → agent 重连后自动清 loc
       await new Promise((r) => setTimeout(r, 500));
     }
 
-    // 等待 lock 被清 + server currentWorkspace 置空
+    // 等待 lock 被清 + server currentCapabilitySet 置空
     let lockCleared = false;
     let wsCleared = false;
     for (let i = 0; i < 60; i++) {
@@ -111,7 +111,7 @@ describe("L3 drift-self-heal: lock 文件全缺 → agent 重连后自动清 loc
       if (lockCleared) {
         try {
           const proj = await api.getProject(projectId);
-          if (proj.subscriptions.every((s) => s.workspaceId === null)) {
+          if (proj.subscriptions.every((s) => s.capabilitySetId === null)) {
             wsCleared = true;
             break;
           }

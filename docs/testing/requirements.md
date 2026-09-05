@@ -31,7 +31,7 @@
    - 一旦要补"真实模拟测试"（真实 server 进程 + 真实 cli agent + 真实 WS + 真实磁盘），就会触碰真实端口与真实 `~/.loom`，污染面更大。
 
 3. **fixture/seed 散落**
-   - marketplace fixture 在 `server/src/marketplace/__tests__/fixtures/`；CLI 测试在用例内手搓 `writeLock/writeProject`；server e2e 在用例内手搓 asset/workspace。
+   - marketplace fixture 在 `server/src/marketplace/__tests__/fixtures/`；CLI 测试在用例内手搓 `writeLock/writeProject`；server e2e 在用例内手搓 asset/能力集。
    - 没有统一的 seed 数据集，"用例真实"无标准可依。
 
 4. **并发执行会撞**
@@ -109,7 +109,7 @@
 | 镜像 | 作用 | 内容 |
 |------|------|------|
 | `loom-test-base` | 基础环境 | Node + pnpm + git + 系统依赖（better-sqlite3 编译工具链） |
-| `loom-test-builder` | 编译中间层 | workspace 源码 + `just build` 产物（server/cli/web dist） |
+| `loom-test-builder` | 编译中间层 | 能力集 源码 + `just build` 产物（server/cli/web dist） |
 | `loom-test-runtime` | 测试运行时 | base + 编译产物 + vitest + 测试框架 + fixture 仓库 + seed 数据 + 编排器 |
 
 构建产物在镜像内固化，测试时不再依赖宿主机源码状态，保证可重复。
@@ -130,7 +130,7 @@
 | 类型 | 位置 | 说明 |
 |------|------|------|
 | Fixture 仓库 | 镜像内 `/opt/loom/fixtures/repos/*` | 确定性本地 git 仓库（marketplace 测试用），不联网 |
-| Seed 数据 | 镜像内 `/opt/loom/fixtures/seed/*.json` | 用户/asset/workspace 种子，按场景分组 |
+| Seed 数据 | 镜像内 `/opt/loom/fixtures/seed/*.json` | 用户/asset/能力集 种子，按场景分组 |
 | 项目模板 | 镜像内 `/opt/loom/fixtures/projects/*` | 预制 `.cursor/`、`.codebuddy/` 等目录结构 |
 | 期望落盘 | 镜像内 `/opt/loom/fixtures/expected/*` | 安装后预期的磁盘快照，用于断言 |
 
@@ -152,7 +152,7 @@
 | 类型 | 粒度 | 示例 |
 |------|------|------|
 | 单点 | 单个 API / 单命令 / 单 adapter 行为 | `POST /api/assets` 校验失败返回 400；`loom login` 错误 token 返回 401 |
-| 操作流程 | 一个角色完成一个完整任务 | 用户登录 → 创建 asset → 组 workspace → CLI 注册项目 → 安装 → 控制台看到镜像 |
+| 操作流程 | 一个角色完成一个完整任务 | 用户登录 → 创建 asset → 组 能力集 → CLI 注册项目 → 安装 → 控制台看到镜像 |
 | 流程编排 | 多角色/多项目/多状态 | 见 §6 |
 
 ### 5.2 场景维度（**必须覆盖，不为通过而写**）
@@ -161,13 +161,13 @@
 
 | 维度 | 必测场景（示例） |
 |------|------------------|
-| Happy path | 六类 asset 创建、workspace 组合、安装、同步 |
+| Happy path | 六类 asset 创建、能力集 组合、安装、同步 |
 | 错误路径 | 认证失败、权限拒绝、校验失败、资源不存在、落盘身份冲突 409、marketplace 同名 409 |
 | 边界 | 空 content、超长 content（>1MB）、page=0、超大 pageSize、空结果集、同名并发创建 |
 | 一致性 | drift 自动清 lock、orphan 清理、lock 残留、MCP 聚合冲突、legacy lock 拒绝 toggle |
 | 同步 | auto 在线同步、locked 不同步、离线期间变更上线补偿、agent 重连重推、成员移除不补偿（当前保守行为） |
 | 生命周期 | 安装→更新→卸载→重装、token 重生成旧 token 失效、session 过期、能力 toggle on/off 来回搬家 |
-| 并发 | 并发安装同一 workspace、并发 push 同名、并发创建同名 workspace |
+| 并发 | 并发安装同一 能力集、并发 push 同名、并发创建同名 能力集 |
 | 安全 | 路径穿越写入、symlink 逃逸（scanner 已有，需端到端复现）、XSS content 存储/读取、未授权访问私有 asset |
 
 ### 5.3 "不为通过而写"的硬约束
@@ -191,16 +191,16 @@
 ### 6.2 编排用例示例（须实现）
 
 1. **跨用户 auto 同步编排**
-   - 用户 A 创建 public workspace（含 2 asset）→ 用户 B CLI 注册项目并安装 → A 更新成员（+1 asset）→ B 项目自动同步落盘 → 断言 B 磁盘出现第 3 个文件。
+   - 用户 A 创建 public 能力集（含 2 asset）→ 用户 B CLI 注册项目并安装 → A 更新成员（+1 asset）→ B 项目自动同步落盘 → 断言 B 磁盘出现第 3 个文件。
 
 2. **离线补偿编排**
-   - B 安装 workspace（auto）→ B agent 离线 → A 修改 asset 内容 → A 移除一个成员 → B 上线 → 断言：内容更新已补偿，成员移除**当前不补偿**（与产品文档一致）。
+   - B 安装 能力集（auto）→ B agent 离线 → A 修改 asset 内容 → A 移除一个成员 → B 上线 → 断言：内容更新已补偿，成员移除**当前不补偿**（与产品文档一致）。
 
 3. **token 生命周期编排**
    - A 获取 token → A 的 agent 在线 → A 重生成 token → 断言旧 token agent 断连 → A 用新 token 重连 → 项目状态恢复 online。
 
 4. **drift 自愈编排**
-   - 安装 workspace → 手动删除 lock 中全部文件 → 触发 scan → 断言 lock 自动清空 + server current_workspace 置空。
+   - 安装 能力集 → 手动删除 lock 中全部文件 → 触发 scan → 断言 lock 自动清空 + server current_capability_set 置空。
 
 5. **聚合冲突编排**
    - 两个 MCP asset 同名 → 安装到同一 claudecode → 断言 `.mcp.json` 聚合后只剩一个 server（按产品定义的覆盖语义）。

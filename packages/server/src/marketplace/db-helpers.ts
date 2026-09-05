@@ -83,12 +83,12 @@ export const sourceQueries = {
   delete(id: string): void {
     // assets.source_id has ON DELETE CASCADE, so deleting the source cascades
     // to its assets. But several tables reference assets(id) WITHOUT cascade:
-    //   - workspace_assets.asset_id        (asset may be pinned to a non-source workspace)
+    //   - capability_set_assets.asset_id        (asset may be pinned to a non-source capability set)
     //   - project_installed_assets.asset_id
     //   - project_disabled_assets.asset_id
-    // Likewise workspace_assets.workspace_id has no cascade, and the source's
-    // own workspaces get cascade-deleted. Clean up every referencing row first,
-    // then let CASCADE handle assets / workspaces / sync_logs / child sources.
+    // Likewise capability_set_assets.capability_set_id has no cascade, and the source's
+    // own capability_sets get cascade-deleted. Clean up every referencing row first,
+    // then let CASCADE handle assets / capability_sets / sync_logs / child sources.
     // Wrap in a transaction so we don't leave half-deleted state.
     const txn = db.transaction((sourceId: string) => {
       db.prepare(`
@@ -99,18 +99,18 @@ export const sourceQueries = {
         DELETE FROM project_installed_assets
         WHERE asset_id IN (SELECT id FROM assets WHERE source_id = ?)
       `).run(sourceId);
-      // workspace_assets rows holding a source asset (incl. ones pinned to
-      // non-source workspaces) — must go before assets are cascade-deleted.
+      // capability_set_assets rows holding a source asset (incl. ones pinned to
+      // non-source capability_sets) — must go before assets are cascade-deleted.
       db.prepare(`
-        DELETE FROM workspace_assets
+        DELETE FROM capability_set_assets
         WHERE asset_id IN (SELECT id FROM assets WHERE source_id = ?)
       `).run(sourceId);
-      // workspace_assets rows inside the source's own workspaces (assets that
-      // were pinned into a source workspace but don't belong to the source) —
-      // must go before those workspaces are cascade-deleted.
+      // capability_set_assets rows inside the source's own capability_sets (assets that
+      // were pinned into a source capability set but don't belong to the source) —
+      // must go before those capability_sets are cascade-deleted.
       db.prepare(`
-        DELETE FROM workspace_assets
-        WHERE workspace_id IN (SELECT id FROM workspaces WHERE source_id = ?)
+        DELETE FROM capability_set_assets
+        WHERE capability_set_id IN (SELECT id FROM capability_sets WHERE source_id = ?)
       `).run(sourceId);
       db.prepare("DELETE FROM marketplace_sources WHERE id = ?").run(sourceId);
     });
@@ -120,15 +120,15 @@ export const sourceQueries = {
     db.prepare(`UPDATE assets SET source_id = NULL, source_path = NULL, source_origin_author = NULL, author = ?, updated_at = ? WHERE source_id = ?`).run(
       replacementAuthor, new Date().toISOString(), id,
     );
-    db.prepare(`UPDATE workspaces SET source_id = NULL, source_plugin = NULL, updated_at = ? WHERE source_id = ?`).run(
+    db.prepare(`UPDATE capability_sets SET source_id = NULL, source_plugin = NULL, updated_at = ? WHERE source_id = ?`).run(
       new Date().toISOString(), id,
     );
   },
   countAssets(id: string): number {
     return (db.prepare("SELECT COUNT(*) AS c FROM assets WHERE source_id = ? AND deleted_at IS NULL").get(id) as any).c;
   },
-  countWorkspaces(id: string): number {
-    return (db.prepare("SELECT COUNT(*) AS c FROM workspaces WHERE source_id = ?").get(id) as any).c;
+  countCapabilitySets(id: string): number {
+    return (db.prepare("SELECT COUNT(*) AS c FROM capability_sets WHERE source_id = ?").get(id) as any).c;
   },
 };
 

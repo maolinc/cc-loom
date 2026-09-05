@@ -25,7 +25,7 @@ const PROJECT_ID = "p-skill-stats-test";
 
 function lockWithSkill(enabled: boolean): LockFile {
   return {
-    subscriptions: [{ workspaceId: "w1", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
+    subscriptions: [{ capabilitySetId: "w1", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
     version: "1",
     assets: {
       "asset-1": {

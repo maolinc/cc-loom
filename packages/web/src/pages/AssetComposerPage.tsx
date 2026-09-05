@@ -60,7 +60,7 @@ export default function AssetComposerPage() {
   const [saving, setSaving] = useState(false);
   const [generatingBasicInfo, setGeneratingBasicInfo] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // 该能力是否已被工作空间/本地项目引用：编辑态下为 true 时锁定「名称」（只能改别名），
+  // 该能力是否已被能力集/本地项目引用：编辑态下为 true 时锁定「名称」（只能改别名），
   // 与后端 PUT 改名拦截保持一致；AI 生成也不得改写已锁定的名称。
   const [referenced, setReferenced] = useState(false);
   const nameLocked = isEdit && referenced;
@@ -78,7 +78,7 @@ export default function AssetComposerPage() {
       setLoading(false);
       if (res.success && res.data) {
         setForm(assetToForm(res.data));
-        // 服务端返回 refs: { workspaceRefs, installRefs, total }
+        // 服务端返回 refs: { capabilitySetRefs, installRefs, total }
         setReferenced(!!res.data.refs?.total);
       } else setLoadError(res.error || "无法加载该能力");
     });
@@ -304,7 +304,7 @@ export default function AssetComposerPage() {
                   className={inputCls}
                   disabled={nameLocked}
                   readOnly={nameLocked}
-                  title={nameLocked ? "该能力已被工作空间或本地项目引用，名称不可修改" : undefined}
+                  title={nameLocked ? "该能力已被能力集或本地项目引用，名称不可修改" : undefined}
                 />
               </Field>
               <Field label="别名（可选，可中文）">

@@ -59,7 +59,7 @@ describe("L3 install-flow: 六类 asset × 四种 tool 落盘", () => {
   ): Promise<void> {
     const { result } = await api.installExecute({
       projectId: agent!.projectId,
-      workspaceId: wsId,
+      capabilitySetId: wsId,
       targetTools: [targetTool as any],
       policy: "locked",
     });
@@ -85,7 +85,7 @@ describe("L3 install-flow: 六类 asset × 四种 tool 落盘", () => {
     const unmappable = await api.createAsset(assetBuilders.hook("c-unmappable", "PostCompact", ["cursor"]));
     const agentAsset = await api.createAsset(assetBuilders.agent("c-agent", ["cursor"]));
 
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "ws-cursor", description: "cursor test", targetTools: ["cursor"], visibility: "public" },
       [skill.id, rule.id, mcp.id, cmd.id, hook.id, unmappable.id, agentAsset.id],
     );
@@ -126,7 +126,7 @@ describe("L3 install-flow: 六类 asset × 四种 tool 落盘", () => {
     const hook = await api.createAsset(assetBuilders.hook("cc-hook", "PreToolUse", ["claudecode"]));
     const agentAsset = await api.createAsset(assetBuilders.agent("cc-agent", ["claudecode"]));
 
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "ws-cc", description: "claudecode test", targetTools: ["claudecode"], visibility: "public" },
       [skill.id, rule.id, mcp.id, cmd.id, hook.id, agentAsset.id],
     );
@@ -166,7 +166,7 @@ describe("L3 install-flow: 六类 asset × 四种 tool 落盘", () => {
     const cmd = await api.createAsset(assetBuilders.command("cx-cmd", "/test", ["cursor"]));
     const agentAsset = await api.createAsset(assetBuilders.agent("cx-agent", ["codebuddy"]));
 
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "ws-codex", description: "codex test", targetTools: ["codex"], visibility: "public" },
       [skill.id, rule.id, mcp.id, hook.id, cmd.id, agentAsset.id],
     );

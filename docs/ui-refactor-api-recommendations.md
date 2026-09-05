@@ -14,9 +14,9 @@
 | 场景 | 依赖的现有字段 | 说明 |
 |------|----------------|------|
 | 能力市场卡片 | `Asset.type / name / description / tags / compatibleTools / author / version / updatedAt / sourceDisplayName` | 信息层级完整 |
-| 单 Asset 安装 | `POST /projects/:id/implicit-workspace` + `/install/plan` + `/install/execute` | 已复用隐式工作空间闭环，无需扩展 install schema |
-| 工作空间卡片 | `Workspace.name / description / visibility / targetTools / version`，列表附带 `assetTypes` | 组成类型统计来自 `assetTypes` |
-| 本地控制台镜像 | `LocalProjectState.vendors / capabilities / installedWorkspaceId / driftCleared / legacyLock` | 厂商目录、能力开关、漂移修复均已覆盖 |
+| 单 Asset 安装 | `POST /projects/:id/capabilities/add` + `/install/plan` + `/install/execute` | 已复用隐式能力集闭环，无需扩展 install schema |
+| 能力集卡片 | `CapabilitySet.name / description / visibility / targetTools / version`，列表附带 `assetTypes` | 组成类型统计来自 `assetTypes` |
+| 本地控制台镜像 | `LocalProjectState.vendors / capabilities / installedCapabilitySetId / driftCleared / legacyLock` | 厂商目录、能力开关、漂移修复均已覆盖 |
 | 安装计划预览 | `InstallPlan.diff / conflicts` | diff 树与冲突提示可渲染 |
 
 ---
@@ -28,12 +28,12 @@
 | 字段 | 类型 | UI 收益 |
 |------|------|---------|
 | `fileCount` | number | 卡片直接显示文件数，免去打开详情才知道体量 |
-| `workspaceCount` | number | 展示「被 N 个工作空间引用」，辅助判断质量 |
+| `capabilitySetCount` | number | 展示「被 N 个能力集引用」，辅助判断质量 |
 | `installCount` | number | 市场热度排序与「热门」标识 |
 | `metadataSummary` | string | 列表无需各端按 type 拼装 metadata 摘要 |
 | `riskFlags` | `{ executable?: boolean; network?: boolean }` | 卡片提前标注 Hook 可执行 / MCP 联网风险 |
 
-### 2.2 Workspace 列表项（`GET /api/workspaces`）
+### 2.2 CapabilitySet 列表项（`GET /api/capability-sets`）
 
 | 字段 | 类型 | UI 收益 |
 |------|------|---------|
@@ -50,7 +50,7 @@
 |------|------|---------|
 | `lastScanAt` | string | 项目卡显示「最近扫描」，无需进入详情 |
 | `problemCount` | number | 项目列表直接标红「N 处缺失/冲突」 |
-| `currentWorkspaceSummary` | `{ assetCount; targetTools }` | 列表内预览当前空间规模 |
+| `currentCapabilitySetSummary` | `{ assetCount; targetTools }` | 列表内预览当前能力集规模 |
 
 > `deviceName` / `lastOnlineAt` 已通过 `device` 字段提供，前端已使用。
 
@@ -76,5 +76,5 @@
 ## 3. 落地建议
 
 - 上述字段全部以**可选字段**形式追加到对应 `serialize*` 响应中，`@maolinc/cc-loom-shared` 的接口用 `?:` 声明，前端按 `field ?? fallback` 消费。
-- 优先级：`skippedItems`（设计稿明确要求） > Asset/Workspace 列表聚合计数 > Project `problemCount` > Marketplace 同步进度。
+- 优先级：`skippedItems`（设计稿明确要求） > Asset/CapabilitySet 列表聚合计数 > Project `problemCount` > Marketplace 同步进度。
 - 任一字段缺失时，当前前端均能正常工作，不会报错或留白。

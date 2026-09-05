@@ -26,7 +26,7 @@ function makeReq(plan: ReconcilePlan, opts: Partial<WsReconcileRequest> = {}): W
   return {
     requestId: "req-diag",
     projectId: PROJECT_ID,
-    subscriptions: opts.subscriptions ?? [{ workspaceId: "ws-diag", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
+    subscriptions: opts.subscriptions ?? [{ capabilitySetId: "ws-diag", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
     targetTools: opts.targetTools ?? ["cursor"],
     plan,
   };

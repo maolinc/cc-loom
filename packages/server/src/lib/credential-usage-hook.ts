@@ -8,7 +8,7 @@
  *
  * 仅记录 path 绑定的使用；env 绑定的使用由 credential_distributions axis=env 体现（设备维度）。
  *
- * 设计：单钩子点，覆盖空间级安装/卸载 + 能力级 enable/disable 两个流程（都收敛到 reconcile）。
+ * 设计：单钩子点，覆盖能力集级安装/卸载 + 能力级 enable/disable 两个流程（都收敛到 reconcile）。
  * 偏差窗口 = 「权威变更 → 下次 reconcile」，与磁盘 .mcp.json 陈旧窗口重合。
  */
 import { db } from "../db/index.js";

@@ -11,7 +11,7 @@ import Button from "./Button.js";
  *   if (empty)   return <EmptyState title="暂无能力" action={...} />;
  */
 
-/** 卡片网格骨架屏：匹配市场 / 工作空间的 3 列网格形态。 */
+/** 卡片网格骨架屏：匹配市场 / 能力集的 3 列网格形态。 */
 export function CardGridSkeleton({ count = 6 }: { count?: number }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -139,7 +139,7 @@ export default function HomePage() {
         <EmptyState
           icon={<Sparkles className="w-8 h-8" />}
           title={filtering ? "没有匹配的能力" : "还没有能力"}
-          description={filtering ? "试试更换关键词或清除类型筛选。" : user ? "创建你的第一个 Skill、Rule、MCP 或 Hook，开始搭建工作空间。" : "公开能力会展示在这里，登录后可以创建和管理自己的能力。"}
+          description={filtering ? "试试更换关键词或清除类型筛选。" : user ? "创建你的第一个 Skill、Rule、MCP 或 Hook，开始搭建能力集。" : "公开能力会展示在这里，登录后可以创建和管理自己的能力。"}
           action={
             filtering ? (
               <Button variant="secondary" onClick={() => { setSearch(""); setTypeFilter(""); setVisibility(""); setSourceFilter(""); }}>清除筛选</Button>

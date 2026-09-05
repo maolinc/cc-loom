@@ -23,7 +23,7 @@ interface SearchInputProps {
   stacked?: boolean;
   /**
    * 手动提交模式：输入不再自动触发搜索，改为按 Enter 或点击搜索按钮时才提交。
-   * 启用后渲染内置搜索按钮，占据 actions 位置。用于能力市场 / 工作空间列表。
+   * 启用后渲染内置搜索按钮，占据 actions 位置。用于能力市场 / 能力集列表。
    */
   manualSubmit?: boolean;
   /** 搜索进行中：搜索按钮转圈并禁用，避免重复提交。 */

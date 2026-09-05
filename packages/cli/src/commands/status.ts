@@ -8,8 +8,8 @@
  * - 服务端设备状态（GET /api/devices）
  * - 服务端项目列表（GET /api/projects），与本地缓存合并显示 lastInstalledAt
  * - 同步队列（GET /api/sync-outbox/stats）：ready / backoff / dead-letter
- * - 每个项目：本地 lock 安装 asset vs 服务端 workspace 当前成员 的 diff
- *   （应有未装 / 多装未在 workspace 内）
+ * - 每个项目：本地 lock 安装 asset 与服务端能力集当前成员的 diff
+ *   （应有未装 / 多装未在能力集内）
  *
  * 输出格式：
  *  - 默认：人类可读的色彩化文本
@@ -29,8 +29,8 @@ interface OutboxStats {
   deadLetter: number;
 }
 
-/** /api/workspaces/:id 返回的 workspace 详情中我们仅需 assets[].id / name。 */
-interface WorkspaceLite {
+/** /api/capability-sets/:id 返回的能力集详情中我们仅需 assets[].id / name。 */
+interface CapabilitySetLite {
   id: string;
   name: string;
   assets: { id: string; name: string }[];
@@ -38,14 +38,14 @@ interface WorkspaceLite {
 
 interface ProjectSyncDiff {
   status:
-    | "in-sync"          // lock 与 workspace 完全一致
-    | "drift"            // lock 与 workspace 有差异（missing/extra > 0）
-    | "no-lock"          // 项目绑定了 workspace 但本地无 lock
+    | "in-sync"          // lock 与能力集完全一致
+    | "drift"            // lock 与能力集有差异（missing/extra > 0）
+    | "no-lock"          // 项目订阅了能力集但本地无 lock
     | "legacy-lock"      // 旧格式 lock，需重装
-    | "no-workspace"     // 项目未安装任何 workspace
-    | "workspace-unreadable"; // workspace 私有或已删，无权读
+    | "no-capability-set"     // 项目未安装任何能力集
+    | "capability-set-unreadable"; // 能力集私有或已删，无权读
   missing: { id: string; name: string }[]; // 应装未装
-  extra: string[];                          // 本地多装（lock 里有但 workspace 没有）
+  extra: string[];                          // 本地多装（lock 里有但能力集没有）
 }
 
 interface ProjectStatusEntry {
@@ -53,10 +53,10 @@ interface ProjectStatusEntry {
   name: string;
   path: string;
   status: string;
-  /** 显式订阅的工作空间 id 列表（ADR-0006 多空间）。 */
-  workspaceIds: string[];
-  /** 已解析的工作空间名（与 workspaceIds 对齐；读不到时为 null）。 */
-  workspaceNames: (string | null)[];
+  /** 显式订阅的能力集 id 列表（ADR-0006 多能力集）。 */
+  capabilitySetIds: string[];
+  /** 已解析的能力集名（与 capabilitySetIds 对齐；读不到时为 null）。 */
+  capabilitySetNames: (string | null)[];
   lastInstalledAt: string | null;
   sync: ProjectSyncDiff | null; // 取不到 server 状态时 null
 }
@@ -159,7 +159,7 @@ async function gather(config: { endpoint: string; token: string; deviceId: strin
     projectsById.set(p.id, { ...cur, local: p });
   }
 
-  const wsCache = new Map<string, WorkspaceLite | null>();
+  const capabilitySetCache = new Map<string, CapabilitySetLite | null>();
   const projects: ProjectStatusEntry[] = [];
   for (const { server, local } of projectsById.values()) {
     const id = (server?.id ?? local?.id)!;
@@ -167,36 +167,38 @@ async function gather(config: { endpoint: string; token: string; deviceId: strin
     const path = server?.normalizedPath ?? local?.normalizedPath ?? "?";
     const status = server?.status ?? local?.status ?? "registered";
     const lock = readLock(id);
-    // 多空间订阅：以 server 订阅为准，本地 lock（v3 subscriptions / 旧单值 workspaceId）兜底。
-    const serverWsIds = (server?.subscriptions ?? [])
-      .map((s) => s.workspaceId)
+    // 多能力集订阅：以 server 订阅为准，本地 lock 兜底；readLock 已归一化旧格式。
+    const serverCapabilitySetIds = (server?.subscriptions ?? [])
+      .map((s) => s.capabilitySetId)
       .filter((x): x is string => !!x);
-    const localWsIds = lock?.subscriptions
-      ? lock.subscriptions.map((s) => s.workspaceId).filter((x): x is string => !!x)
-      : (lock?.workspaceId ? [lock.workspaceId] : []);
-    const wsIds = serverWsIds.length > 0 ? serverWsIds : localWsIds;
+    const localCapabilitySetIds = lock?.subscriptions
+      ? lock.subscriptions.map((s) => s.capabilitySetId).filter((x): x is string => !!x)
+      : [];
+    const capabilitySetIds = serverCapabilitySetIds.length > 0
+      ? serverCapabilitySetIds
+      : localCapabilitySetIds;
     const lastInstalledAt = local?.lastInstalledAt ?? null;
 
     let sync: ProjectSyncDiff | null = null;
-    const workspaceNames: (string | null)[] = [];
-    if (wsIds.length === 0) {
-      sync = { status: "no-workspace", missing: [], extra: [] };
+    const capabilitySetNames: (string | null)[] = [];
+    if (capabilitySetIds.length === 0) {
+      sync = { status: "no-capability-set", missing: [], extra: [] };
     } else if (!lock) {
       sync = { status: "no-lock", missing: [], extra: [] };
     } else if (isLegacyLock(lock)) {
       sync = { status: "legacy-lock", missing: [], extra: [] };
     } else if (me) {
-      // 所有订阅空间的资产并集为期望集；共享能力（多空间同 id）天然去重。
+      // 所有订阅能力集的资产并集为期望集；共享能力（多能力集同 id）天然去重。
       const desired = new Map<string, string>(); // assetId → name
       let unreadable = false;
-      for (const wsId of wsIds) {
-        const ws = await loadWorkspaceLite(config, wsId, wsCache);
-        workspaceNames.push(ws?.name ?? null);
-        if (!ws) { unreadable = true; continue; }
-        for (const a of ws.assets) if (!desired.has(a.id)) desired.set(a.id, a.name);
+      for (const capabilitySetId of capabilitySetIds) {
+        const capabilitySet = await loadCapabilitySetLite(config, capabilitySetId, capabilitySetCache);
+        capabilitySetNames.push(capabilitySet?.name ?? null);
+        if (!capabilitySet) { unreadable = true; continue; }
+        for (const a of capabilitySet.assets) if (!desired.has(a.id)) desired.set(a.id, a.name);
       }
       if (unreadable && desired.size === 0) {
-        sync = { status: "workspace-unreadable", missing: [], extra: [] };
+        sync = { status: "capability-set-unreadable", missing: [], extra: [] };
       } else {
         const installed = new Set(Object.keys(lock.assets ?? {}));
         const missingIds = [...desired.keys()].filter((x) => !installed.has(x));
@@ -215,8 +217,8 @@ async function gather(config: { endpoint: string; token: string; deviceId: strin
 
     projects.push({
       id, name, path, status, lastInstalledAt,
-      workspaceIds: wsIds,
-      workspaceNames,
+      capabilitySetIds,
+      capabilitySetNames,
       sync,
     });
   }
@@ -291,15 +293,15 @@ function renderText(r: StatusReport): void {
     console.log(`  ${color.bold(p.name)}  ${statusBadge}`);
     kv("ID", p.id);
     kv("Path", p.path);
-    kv("Workspaces", p.workspaceIds.length === 0
+    kv("Capability Sets", p.capabilitySetIds.length === 0
       ? "(未安装)"
-      : p.workspaceIds.map((id, i) => p.workspaceNames[i] ?? id).join(", "));
+      : p.capabilitySetIds.map((id, i) => p.capabilitySetNames[i] ?? id).join(", "));
     kv("LastInstall", p.lastInstalledAt ? formatRelative(p.lastInstalledAt) : "—");
 
     if (p.sync) {
       switch (p.sync.status) {
         case "in-sync":
-          kv("同步状态", color.green("✓ 与工作空间一致"));
+          kv("同步状态", color.green("✓ 与能力集一致"));
           break;
         case "drift": {
           const parts: string[] = [];
@@ -318,10 +320,10 @@ function renderText(r: StatusReport): void {
         case "legacy-lock":
           kv("同步状态", color.dim("旧格式 lock（重新安装即升级）"));
           break;
-        case "workspace-unreadable":
-          kv("同步状态", color.dim("工作空间不可读（已删除或无权访问）"));
+        case "capability-set-unreadable":
+          kv("同步状态", color.dim("能力集不可读（已删除或无权访问）"));
           break;
-        case "no-workspace":
+        case "no-capability-set":
           // 已经用 "(未安装)" 表达，不再赘述
           break;
       }
@@ -330,19 +332,19 @@ function renderText(r: StatusReport): void {
   }
 }
 
-/** 按需 GET /api/workspaces/:id，单 status 进程内缓存。私有/无权访问归一为 null。 */
-async function loadWorkspaceLite(
+/** 按需 GET /api/capability-sets/:id，单 status 进程内缓存。私有/无权访问归一为 null。 */
+async function loadCapabilitySetLite(
   config: { endpoint: string; token: string; deviceId: string },
-  workspaceId: string,
-  cache: Map<string, WorkspaceLite | null>,
-): Promise<WorkspaceLite | null> {
-  if (cache.has(workspaceId)) return cache.get(workspaceId)!;
+  capabilitySetId: string,
+  cache: Map<string, CapabilitySetLite | null>,
+): Promise<CapabilitySetLite | null> {
+  if (cache.has(capabilitySetId)) return cache.get(capabilitySetId)!;
   try {
-    const ws = await api<WorkspaceLite>(config, `/api/workspaces/${workspaceId}`);
-    cache.set(workspaceId, ws);
-    return ws;
+    const capabilitySet = await api<CapabilitySetLite>(config, `/api/capability-sets/${capabilitySetId}`);
+    cache.set(capabilitySetId, capabilitySet);
+    return capabilitySet;
   } catch {
-    cache.set(workspaceId, null);
+    cache.set(capabilitySetId, null);
     return null;
   }
 }

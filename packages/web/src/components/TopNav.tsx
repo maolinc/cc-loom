@@ -41,7 +41,7 @@ export default function TopNav() {
         </Link>
 
         <Link to="/" className={linkClass("/")}>能力市场</Link>
-        <Link to="/workspaces" className={linkClass("/workspaces")}>工作空间</Link>
+        <Link to="/capability-sets" className={linkClass("/capability-sets")}>能力集</Link>
         <Link to="/console" className={linkClass("/console")}>本地控制台</Link>
         <Link to="/docs" className={linkClass("/docs")}>文档</Link>
 
@@ -70,12 +70,12 @@ export default function TopNav() {
                   </span>
                 </button>
                 <button
-                  onClick={() => { setMenuOpen(false); navigate(user ? "/workspaces/new" : "/login"); }}
+                  onClick={() => { setMenuOpen(false); navigate(user ? "/capability-sets/new" : "/login"); }}
                   className="w-full flex items-start gap-2.5 px-3 py-2 rounded-lg hover:bg-surface-card text-left transition-colors"
                 >
                   <Boxes size={16} className="text-brand mt-0.5 shrink-0" />
                   <span>
-                    <span className="block text-sm font-medium text-text-primary">新建工作空间</span>
+                    <span className="block text-sm font-medium text-text-primary">新建能力集</span>
                     <span className="block text-[11px] text-text-muted">组合多个能力</span>
                   </span>
                 </button>

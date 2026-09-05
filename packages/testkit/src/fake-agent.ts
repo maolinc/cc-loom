@@ -65,10 +65,20 @@ export class FakeAgent {
       if (this.failReconcile) {
         resPayload = { requestId, success: false, error: "fake-agent failure" };
       } else {
-        resPayload = { requestId, success: true, data: { filesWritten: [], filesRemoved: [], lockWorkspaceId: payload.workspaceId ?? null } };
+        resPayload = {
+          requestId,
+          success: true,
+          data: {
+            filesWritten: [],
+            filesRemoved: [],
+            lockCapabilitySetIds: (payload.subscriptions ?? [])
+              .map((subscription: { capabilitySetId?: string | null }) => subscription.capabilitySetId)
+              .filter(Boolean),
+          },
+        };
       }
     } else {
-      resPayload = { requestId, success: true, data: { success: true, workspaceId: "", projectId: payload.projectId ?? "", completedAt: new Date().toISOString(), filesWritten: [], errors: [] } };
+      resPayload = { requestId, success: true, data: { success: true, capabilitySetId: "", projectId: payload.projectId ?? "", completedAt: new Date().toISOString(), filesWritten: [], errors: [] } };
     }
     this.ws.send(JSON.stringify({ type: "res", payload: resPayload }));
     for (let i = this.waiters.length - 1; i >= 0; i--) {

@@ -8,7 +8,7 @@
  *  3. ClaudeCode 的项目根 `.mcp.json` 必须被合并到 claudecode 树顶部，
  *     否则用户在镜像里完全看不到这个文件。
  *  4. drift 自动修复：lock 中所有文件全部不在磁盘上时，scan 主动删 lock 并把
- *     `installedWorkspaceId` 设为 null（avoid 假装"已安装"的鬼态）。
+ *     `installedCapabilitySetId` 设为 null（avoid 假装"已安装"的鬼态）。
  *  5. 部分缺失只计 `missingCount`，不动 lock（保留下次手动重装的可能）。
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -95,7 +95,7 @@ describe("scanProjectState", () => {
       expect(state.vendors[tool].managedCount).toBe(0);
       expect(state.vendors[tool].externalCount).toBe(0);
     }
-    expect(state.installedWorkspaceIds).toEqual([]);
+    expect(state.installedCapabilitySetIds).toEqual([]);
     expect(state.driftCleared).toBe(false);
   });
 
@@ -122,14 +122,14 @@ describe("scanProjectState", () => {
     writeFileSync(join(root, ".claude/skills/foo.md"), "x");
     writeFileSync(join(root, ".mcp.json"), '{"mcpServers":{}}');
     writeLock("p-test", {
-      subscriptions: [{ workspaceId: "ws1", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
+      subscriptions: [{ capabilitySetId: "ws1", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
       version: "1",
       assets: { __plan__: { version: "1", files: [".claude/skills/foo.md", ".mcp.json"] } },
     });
 
     const state = scanProjectState(makeProject(root));
     const cc = state.vendors.claudecode;
-    expect(state.installedWorkspaceIds).toEqual(["ws1"]);
+    expect(state.installedCapabilitySetIds).toEqual(["ws1"]);
     expect(state.driftCleared).toBe(false);
     // foo.md 和 .mcp.json 都应是 managed
     expect(cc.tree[0]?.name).toBe(".mcp.json");
@@ -141,7 +141,7 @@ describe("scanProjectState", () => {
   it("lock 文件全部缺失 → 自动清空 lock (driftCleared=true)", () => {
     // 不创建任何 vendor 目录，但写一个引用不存在文件的 lock
     writeLock("p-test", {
-      subscriptions: [{ workspaceId: "ws-bogus", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
+      subscriptions: [{ capabilitySetId: "ws-bogus", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
       version: "1",
       assets: { __plan__: { version: "1", files: [".cursor/skills/nope.md", ".claude/agents/x.md"] } },
     });
@@ -149,7 +149,7 @@ describe("scanProjectState", () => {
 
     const state = scanProjectState(makeProject(root));
     expect(state.driftCleared).toBe(true);
-    expect(state.installedWorkspaceIds).toEqual([]);
+    expect(state.installedCapabilitySetIds).toEqual([]);
     // lock 应被自动删除
     expect(readLock("p-test")).toBeNull();
   });
@@ -159,7 +159,7 @@ describe("scanProjectState", () => {
     // 只写 foo.md，bar.md 缺失
     writeFileSync(join(root, ".cursor/skills/foo.md"), "x");
     writeLock("p-test", {
-      subscriptions: [{ workspaceId: "ws-partial", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
+      subscriptions: [{ capabilitySetId: "ws-partial", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
       version: "1",
       assets: { __plan__: { version: "1", files: [".cursor/skills/foo.md", ".cursor/skills/bar.md"] } },
     });
@@ -167,7 +167,7 @@ describe("scanProjectState", () => {
     const state = scanProjectState(makeProject(root));
     // 有部分命中 → 不触发 drift 自动清空
     expect(state.driftCleared).toBe(false);
-    expect(state.installedWorkspaceIds).toEqual(["ws-partial"]);
+    expect(state.installedCapabilitySetIds).toEqual(["ws-partial"]);
     // lock 仍在
     expect(readLock("p-test")).not.toBeNull();
     // 计数：managed 1, missing 1
@@ -184,7 +184,7 @@ describe("scanProjectState", () => {
       JSON.stringify({ mcpServers: { pencil: { command: "npx-pencil" } } }, null, 2),
     );
     writeLock("p-test", {
-      subscriptions: [{ workspaceId: "ws", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
+      subscriptions: [{ capabilitySetId: "ws", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
       version: "1",
       lockFormat: "2",
       assets: {
@@ -221,7 +221,7 @@ describe("scanProjectState", () => {
       JSON.stringify({ mcpServers: { tapd_mcp_http: { type: "http", url: "x" } } }, null, 2),
     );
     writeLock("p-test", {
-      subscriptions: [{ workspaceId: "ws", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
+      subscriptions: [{ capabilitySetId: "ws", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
       version: "1",
       lockFormat: "2",
       assets: {
@@ -269,7 +269,7 @@ describe("scanProjectState", () => {
       JSON.stringify({ mcpServers: { tapd_mcp_http: { type: "http", url: "x" } } }, null, 2),
     );
     writeLock("p-test", {
-      subscriptions: [{ workspaceId: "ws", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
+      subscriptions: [{ capabilitySetId: "ws", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
       version: "1",
       lockFormat: "2",
       assets: {
@@ -335,7 +335,7 @@ describe("scanProjectState — sourcePath 标记", () => {
     writeFileSync(join(root, ".cursor/skills/extra.md"), "y"); // 外部文件
 
     writeLock("p-test", {
-      subscriptions: [{ workspaceId: "ws", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
+      subscriptions: [{ capabilitySetId: "ws", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
       version: "1",
       assets: { __plan__: { version: "1", files: [".cursor/skills/skill-scout/SKILL.md"] } },
     });
@@ -510,7 +510,7 @@ describe("scanProjectState — 两视图一致性不变量", () => {
     );
 
     writeLock("p-consistency", {
-      subscriptions: [{ workspaceId: "ws", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
+      subscriptions: [{ capabilitySetId: "ws", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
       version: "1",
       lockFormat: "2",
       assets: {
@@ -569,7 +569,7 @@ describe("scanProjectState — 两视图一致性不变量", () => {
       JSON.stringify({ mcpServers: { svc_a: { command: "a" }, svc_b: { command: "b" } } }, null, 2),
     );
     writeLock("p-consistency", {
-      subscriptions: [{ workspaceId: "ws", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }], version: "1", lockFormat: "2",
+      subscriptions: [{ capabilitySetId: "ws", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }], version: "1", lockFormat: "2",
       assets: {
         "asset-a": {
           version: "1.0.0", files: [], name: "mcp_a", type: "mcp",
@@ -622,7 +622,7 @@ describe("scanProjectState — 两视图一致性不变量", () => {
     mkdirSync(join(root, ".cursor/rules"), { recursive: true });
     // 受管 rule no-console（disabled，不在磁盘 → 占位）
     writeLock("p-consistency", {
-      subscriptions: [{ workspaceId: "ws", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }], version: "1", lockFormat: "2",
+      subscriptions: [{ capabilitySetId: "ws", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }], version: "1", lockFormat: "2",
       assets: {
         "asset-rule": {
           version: "1.0.0", files: [], name: "no-console", type: "rule",

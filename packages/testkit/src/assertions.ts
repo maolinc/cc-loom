@@ -90,24 +90,24 @@ export function readLock(projectId: string): LockFile | null {
   return JSON.parse(readFileSync(lockPath, "utf-8")) as LockFile;
 }
 
-/** 断言 lock 存在且包含指定订阅（workspaceId）/策略匹配（ADR-0006：lock 记录订阅数组）。 */
+/** 断言 lock 存在且包含指定订阅（capabilitySetId）/策略匹配（ADR-0006：lock 记录订阅数组）。 */
 export function expectLock(
   projectId: string,
-  expected: { workspaceId?: string; policy?: SyncPolicy },
+  expected: { capabilitySetId?: string; policy?: SyncPolicy },
 ): void {
   const lock = readLock(projectId);
   if (!lock) {
     throw new Error(`期望 lock 存在但未找到 (projectId=${projectId})`);
   }
-  if (expected.workspaceId !== undefined) {
-    const sub = lock.subscriptions?.find((s) => s.workspaceId === expected.workspaceId);
+  if (expected.capabilitySetId !== undefined) {
+    const sub = lock.subscriptions?.find((s) => s.capabilitySetId === expected.capabilitySetId);
     if (!sub) {
       throw new Error(
-        `lock 中未找到订阅 ${expected.workspaceId}, 实际订阅: ${JSON.stringify(lock.subscriptions)}`,
+        `lock 中未找到订阅 ${expected.capabilitySetId}, 实际订阅: ${JSON.stringify(lock.subscriptions)}`,
       );
     }
     if (expected.policy !== undefined && sub.syncPolicy !== expected.policy) {
-      throw new Error(`订阅 ${expected.workspaceId} policy 不匹配: 期望 ${expected.policy}, 实际 ${sub.syncPolicy}`);
+      throw new Error(`订阅 ${expected.capabilitySetId} policy 不匹配: 期望 ${expected.policy}, 实际 ${sub.syncPolicy}`);
     }
   }
 }

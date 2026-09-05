@@ -1,6 +1,6 @@
 /**
  * 「+ 添加能力」对话框：从 Asset 库挑选若干 asset，调
- * `POST /api/projects/:id/capabilities/add` 追加到当前已安装 Workspace 的本地镜像。
+ * `POST /api/projects/:id/capabilities/add` 追加到当前已安装 CapabilitySet 的本地镜像。
  *
  * 设计：复用 `AssetBrowser` 多选交互；只在弹层里壳，搜索/筛选/列表渲染全部委派。
  */
@@ -13,17 +13,17 @@ import Button from "../../components/Button.js";
 
 interface Props {
   projectId: string;
-  /** 当前已安装 Workspace 的 asset 集合（避免重复添加；UI 上仍然显示，但禁止再选）。 */
+  /** 当前已安装 CapabilitySet 的 asset 集合（避免重复添加；UI 上仍然显示，但禁止再选）。 */
   alreadyInstalledIds: string[];
   onClose: () => void;
   onAdded: () => void;
-  /** 标题（默认「添加能力到当前 Workspace」）。 */
+  /** 标题（默认「添加能力到当前 CapabilitySet」）。 */
   title?: string;
   /** 副标题说明。 */
   subtitle?: string;
   /**
    * 自定义提交逻辑：返回错误信息字符串表示失败，返回 null 表示成功。
-   * 未传时走默认的 `POST /capabilities/add`（增量添加到当前 Workspace）。
+   * 未传时走默认的 `POST /capabilities/add`（增量添加到当前 CapabilitySet）。
    */
   submit?: (assetIds: string[]) => Promise<string | null>;
 }
@@ -33,7 +33,7 @@ export default function AddCapabilityDialog({
   alreadyInstalledIds,
   onClose,
   onAdded,
-  title = "添加能力到当前 Workspace",
+  title = "添加能力到当前 CapabilitySet",
   subtitle = "从 Asset 库挑选若干能力，追加写入到本地厂商目录并更新 lock。",
   submit: submitOverride,
 }: Props) {
@@ -46,7 +46,7 @@ export default function AddCapabilityDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 搜索/类型/来源筛选走服务端：与 WorkspaceComposerPage 保持一致。
+  // 搜索/类型/来源筛选走服务端：与 CapabilitySetComposerPage 保持一致。
   // 单页 100 条 + updated_at DESC 排序下，纯客户端按 type 过滤会让排序靠后的
   // 类型“看起来为空”——这也是之前“不管点哪个 tab 都只显示 skill”的根因。
   useEffect(() => {

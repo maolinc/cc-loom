@@ -17,8 +17,8 @@ function agentAsset(
 
 function manifestOf(assets: ManifestAssetEntry[]): Manifest {
   return {
-    workspaceId: "ws",
-    workspaceName: "ws",
+    capabilitySetId: "ws",
+    capabilitySetName: "ws",
     version: "1",
     targetTools: ["codex"],
     assets,

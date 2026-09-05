@@ -22,8 +22,8 @@ function mcpAsset(name: string, content: string): ManifestAssetEntry {
 
 function manifest(assets: ManifestAssetEntry[]): Manifest {
   return {
-    workspaceId: "ws1",
-    workspaceName: "ws1",
+    capabilitySetId: "ws1",
+    capabilitySetName: "ws1",
     version: "1",
     targetTools: ["cursor", "claudecode", "codebuddy", "codex"],
     assets,

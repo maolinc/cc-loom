@@ -245,7 +245,7 @@ Server 端 `compatible_tools` / `target_tools` / `tool` 列在 SQLite 中是 `TE
 - `packages/server/src/lib/outbox-worker-v2.ts`
 - `packages/server/src/lib/asset-conflicts.ts`
 - `packages/server/src/lib/download-archive.ts`
-- `packages/server/src/routes/projects.ts` / `workspaces.ts`
+- `packages/server/src/routes/projects.ts` / `capability-sets.ts`
 
 **需要按需检查的硬编码点**：
 
@@ -257,7 +257,7 @@ Server 端 `compatible_tools` / `target_tools` / `tool` 列在 SQLite 中是 `TE
 compatibleTools: ["claudecode", "codebuddy", "codex"],
 ```
 
-这是 generic-git 提取资产时的默认兼容厂商集合（不含 cursor 是因为历史原因，cursor 走单独兼容性判断）。**新厂商是否要进入这个默认集合是一个产品决策**——决定 marketplace 导入的资产默认是否对新厂商可见。要加就加，不加也不影响功能（用户可在工作空间里手动勾选）。
+这是 generic-git 提取资产时的默认兼容厂商集合（不含 cursor 是因为历史原因，cursor 走单独兼容性判断）。**新厂商是否要进入这个默认集合是一个产品决策**——决定 marketplace 导入的资产默认是否对新厂商可见。要加就加，不加也不影响功能（用户可在能力集里手动勾选）。
 
 ---
 
@@ -268,7 +268,7 @@ compatibleTools: ["claudecode", "codebuddy", "codex"],
 - `pages/local-console/VendorTabStrip.tsx`（`TARGET_TOOLS.filter`）
 - `pages/local-console/CapabilityMatrix.tsx`（`ADAPTER_SUPPORT`）
 - `pages/local-console/ManageTargetsRow.tsx`（`sortTargetTools`）
-- `components/AssetCard.tsx` / `DetailPanel.tsx` / `WorkspaceCard.tsx`（遍历 `compatibleTools`）
+- `components/AssetCard.tsx` / `DetailPanel.tsx` / `CapabilitySetCard.tsx`（遍历 `compatibleTools`）
 
 ### 5.1 厂商 logo（必改）
 
@@ -373,13 +373,13 @@ import {
 
 // 用例骨架（仿 install-flow.test.ts）
 const skill = await api.createAsset(assetBuilders.skill("f-skill", ["foo"]));
-const ws = await api.createWorkspace(
+const capabilitySet = await api.createCapabilitySet(
   { name: "ws-foo", targetTools: ["foo"], visibility: "public" },
   [skill.id],
 );
 await setup(server.baseUrl, token);  // startAgent + register
 const { result } = await api.installExecute({
-  projectId: agent.projectId, workspaceId: ws.id, targetTools: ["foo"], policy: "locked",
+  projectId: agent.projectId, capabilitySetId: capabilitySet.id, targetTools: ["foo"], policy: "locked",
 });
 expect(result.success).toBe(true);
 expectFileExists(projectRoot, ".foo/skills/f-skill/SKILL.md");
@@ -390,7 +390,7 @@ expectLockVendorState(projectId, "foo", /* enabled asset ids */);
 
 ### 6.3 L4 编排（按需）
 
-`tests/l4-scenarios/multi-asset-install.test.ts` 当前编排"同一 workspace 装到两个项目的不同厂商"。**仅当新厂商有特殊行为（项目根文件、agent 转写）值得加入多厂商编排时**，扩展此用例把新厂商作为第二个/第三个落盘目标，断言其目录。无特殊行为则跳过。
+`tests/l4-scenarios/multi-asset-install.test.ts` 当前编排"同一 能力集 装到两个项目的不同厂商"。**仅当新厂商有特殊行为（项目根文件、agent 转写）值得加入多厂商编排时**，扩展此用例把新厂商作为第二个/第三个落盘目标，断言其目录。无特殊行为则跳过。
 
 ### 6.4 L5 UI（按需）
 
@@ -442,7 +442,7 @@ just test-docker-clean              # 清理镜像
 
 ### 人工冒烟（L3 覆盖不到的部分）
 
-1. Web 工作空间编辑器里勾选新厂商 → 安装计划预览的落盘路径与决策表一致。
+1. Web 能力集编辑器里勾选新厂商 → 安装计划预览的落盘路径与决策表一致。
 2. `loom start` 后本地控制台 → VendorTabStrip 出现新厂商 tab、logo 正常、CapabilityMatrix 的"不支持"单元格正确。
 3. Docs 页 → 新厂商的目录规范展示。
 

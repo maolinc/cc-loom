@@ -45,19 +45,19 @@
 - 其他路径走 `AuthenticatedLayout`。
 - 主导航缓存页用 `KeepAlive` 保持挂载，避免切 tab 重新请求：
   - `/` → `HomePage`
-  - `/workspaces` → `WorkspaceListPage`
+  - `/capability-sets` → `CapabilitySetListPage`
   - `/console` → `LocalConsolePage`
   - `/docs` → `DocsPage`
   - `/settings` → `SettingsPage`
 - 瞬时编辑页不缓存：
-  - `/workspaces/new`
-  - `/workspaces/:id/edit`
+  - `/capability-sets/new`
+  - `/capability-sets/:id/edit`
   - `/assets/new`
   - `/assets/:id/edit`
 
 访问控制：
 
-- public tab：`/`、`/workspaces`、`/docs` 可在未登录状态渲染。
+- public tab：`/`、`/capability-sets`、`/docs` 可在未登录状态渲染。
 - protected path：`/console`、`/settings`、编辑页等需要登录，未登录跳 `/login`。
 
 大页面通过 `lazy()` 做路由级代码分割。
@@ -67,9 +67,9 @@
 | 页面 | 文件 | 职责 |
 |------|------|------|
 | 能力市场 | `pages/HomePage.tsx` | 浏览能力，使用 `AssetBrowser` / `AssetCard` / `DetailPanel`；导入能力卡片显示导入人和具体来源方；skill 卡片展示 `invocationCount`（>0 才显示，紧凑格式 k/w） |
-| 工作空间列表 | `pages/WorkspaceListPage.tsx` | 浏览工作空间；导入工作空间卡片显示导入人和第三方标识 |
+| 能力集列表 | `pages/CapabilitySetListPage.tsx` | 浏览能力集；导入能力集卡片显示导入人和第三方标识 |
 | 能力编辑 | `pages/AssetComposerPage.tsx` | 创建/编辑 Asset、多文件、metadata 表单、AI 生成基础信息回填 |
-| 工作空间编辑 | `pages/WorkspaceComposerPage.tsx` | 创建/编辑 Workspace 和成员能力 |
+| 能力集编辑 | `pages/CapabilitySetComposerPage.tsx` | 创建/编辑 CapabilitySet 和成员能力 |
 | 本地控制台 | `pages/LocalConsolePage.tsx` | 查看项目、安装状态、本地镜像、单项能力操作、删除项目（purge） |
 | 文档页 | `pages/DocsPage.tsx` | 快速开始、CLI 命令、平台/本地同步关系、能力类型、厂商官方链接、兼容矩阵、安装路径 |
 | 设置页 | `pages/SettingsPage.tsx` | 设置容器页，包含账号、AI 生成和 Marketplace tab |
@@ -80,7 +80,7 @@
 - `pages/local-console/CapabilityMatrix.tsx`（skill 行展示本地 `invocationCount`）
 - `MirrorTreeView.tsx`
 - `PreviewPanel.tsx`
-- `SwitchWorkspaceMenu.tsx`
+- `local-console/AddCapabilitySetMenu.tsx`
 - `VendorTabStrip.tsx`
 - `AddCapabilityDialog.tsx`
 
@@ -98,10 +98,10 @@
 | `TopNav` | 顶部导航和登录状态入口 |
 | `KeepAlive` | tab 页面隐藏但保持挂载 |
 | `AssetBrowser` | 能力浏览列表 |
-| `DetailPanel` | Asset/Workspace 详情面板骨架：文件预览、左右栏布局。Workspace 模式右栏双态（工作空间信息 ↔ 点选能力的基本信息；能力完整详情按需拉取 `/assets/:id?lite=1`，失败回退 payload 子集 limited 渲染） |
+| `DetailPanel` | Asset/CapabilitySet 详情面板骨架：文件预览、左右栏布局。CapabilitySet 模式右栏双态（能力集信息 ↔ 点选能力的基本信息；能力完整详情按需拉取 `/assets/:id?lite=1`，失败回退 payload 子集 limited 渲染） |
 | `AssetMeta` | 能力元信息 + 下载 zip + 编辑/删除（权限门控）；`mode="limited"` + `notice` 徽章用于留存/无权回退（隐藏鉴权行与全部操作按钮） |
-| `InstallSection` | 安装到本地项目（单能力走 `/capabilities/add`，工作空间走 installFlow 计划预览） |
-| `WorkspaceCanvas` | 工作空间能力组合视图 |
+| `InstallSection` | 安装到本地项目（单能力走 `/capabilities/add`，能力集走 installFlow 计划预览） |
+| `CapabilitySetCanvas` | 能力集能力组合视图 |
 | `FileTree` / `ContentViewer` | 文件树和内容展示 |
 | `PageState` | loading/empty/error 等页面状态 |
 | `Toast` | 全局提示 |
@@ -115,8 +115,8 @@
 
 `lib/installFlow.ts` 把两种来源统一成同一安装管线：
 
-1. Workspace 安装：已有 `workspaceId`。
-2. 单 Asset 安装：先调用 `POST /projects/:id/implicit-workspace`，拿项目专属隐式 workspace。
+1. CapabilitySet 安装：已有 `capabilitySetId`。
+2. 单 Asset 安装：先调用 `POST /projects/:id/capabilities/add`，拿项目专属隐式 能力集。
 3. 生成计划：`POST /install/plan`。
 4. 执行安装：`POST /install/execute`。
 
@@ -127,14 +127,13 @@
 `DetailPanel` 内置下载入口，均走浏览器 `fetch` + blob 落盘（带 cookie 同源鉴权）：
 
 - 单能力下载：`DownloadAssetButton`（`components/AssetMeta.tsx` 内）→ `GET /api/assets/:id/download`，zip 内为该能力完整内容（预览结构铺放）。任何能查看该能力的用户都可下载。
-- 工作空间下载：`WorkspaceDownloadSection` → `GET /api/workspaces/:id/download`，厂商多选（默认不选 = 预览结构含全部能力）；勾选厂商后实时提示哪些能力因不兼容将被排除，下载后读取 `X-Loom-Skipped` 头用 toast 提示被排除能力。
+- 能力集下载：`CapabilitySetDownloadSection` → `GET /api/capability-sets/:id/download`，厂商多选（默认不选 = 预览结构含全部能力）；勾选厂商后实时提示哪些能力因不兼容将被排除，下载后读取 `X-Loom-Skipped` 头用 toast 提示被排除能力。
 
 ## 表单与能力类型辅助
 
 - `lib/assetForm.ts`：Asset 表单数据、文件、metadata 相关辅助；校验 `name` 只能包含英文、数字、`_`、`-`，`alias` 可中文且用于展示，`sourceUrl` 用于备注来源地址。
 - `lib/capabilitySpec.ts`：能力类型展示/字段配置。
 - `lib/fileUpload.ts`：上传文件解析。
-- `lib/bootstrapWorkspace.ts`：工作空间初始化辅助。
 - `lib/assetDisplay.ts`：Asset 展示名辅助，优先显示 `alias`，否则显示 `name`。
 - `lib/time.ts`：时间展示辅助。
 
@@ -151,8 +150,8 @@ LocalConsolePage
   ├─ POST /api/projects/:id/scan
   ├─ GET /api/projects/:id/files?path=...
   ├─ POST /api/install/plan|execute          （添加/重装订阅；execute 带 skipAssetIds 撞车裁决）
-  ├─ POST /api/projects/:id/subscriptions/:wid/sync-policy|targets
-  ├─ DELETE /api/projects/:id/subscriptions/:wid   （卸载单条订阅）
+  ├─ POST /api/projects/:id/subscriptions/:capabilitySetId/sync-policy|targets
+  ├─ DELETE /api/projects/:id/subscriptions/:capabilitySetId   （卸载单条订阅）
   ├─ POST /api/projects/:id/uninstall        （卸载全部）
   ├─ POST /api/projects/:id/purge   （删除项目：抹掉服务端 + 本地痕迹）
   └─ POST /api/projects/:id/capabilities/*
@@ -166,8 +165,8 @@ Agent push project:state
 Server cache + web:project:state_changed
 ```
 
-多空间订阅（ADR-0006）：「当前工作空间卡」已替换为 `local-console/SubscriptionStrip.tsx`
-订阅条；添加空间走 `local-console/AddWorkspaceMenu.tsx`；同名撞车由
+多能力集订阅（ADR-0006）：「当前能力集卡」已替换为 `local-console/SubscriptionStrip.tsx`
+订阅条；添加能力集走 `local-console/AddCapabilitySetMenu.tsx`；同名撞车由
 `components/InstallConflictDialog.tsx` 逐条裁决；能力矩阵来源徽标/过滤依赖
 server 端 `lib/capability-sources.ts` 富化的 `cap.sources`。
 

@@ -4,23 +4,27 @@ Loom 管理可分发到本地项目的「能力」（skill/rule/mcp/hook/command
 
 ## Language
 
-## 安装与空间
+## 安装与能力集
 
-**多空间安装（Multi-workspace Install）**:
-一个项目同时安装多个 Workspace，能力叠加生效。取代旧的「项目只有一个当前空间、切换即整体替换」语义。
-_Avoid_: 切换工作空间、当前工作空间（currentWorkspaceId 单值模型）
+**能力集（Capability Set）**:
+由多个能力组成、可复用并可整体安装到项目的命名组合。它表达能力编排，不代表文件目录、开发环境或隔离的工作区域。
+_Avoid_: 工作空间、Workspace、能力包
 
-**空间订阅（Workspace Subscription）**:
-项目与 Workspace 之间的一条安装关系记录，形如 (project, workspace, syncPolicy, targetTools, installedAt)。同步策略 auto/locked 与目标厂商都挂在订阅上而非项目上——每个空间独立选择、独立切换；共享能力落在各订阅 targetTools 的并集里，按 (能力 × 厂商) 引用计数。引用计数、卸载、同步触发均围绕订阅展开。单项能力「添加」走隐式 Workspace（见下），也是一条订阅。
-_Avoid_: 安装实例、项目的 syncPolicy 字段
+**多能力集安装（Multi-capability-set Install）**:
+一个项目同时安装多个能力集，能力叠加生效。取代旧的「项目只有一个当前组合、切换即整体替换」语义。
+_Avoid_: 切换能力集、当前能力集（currentCapabilitySetId 单值模型）
 
-**隐式 Workspace（Implicit Workspace）**:
-Server 为单个项目的「添加单项能力」操作创建/复用的特殊 Workspace，复用统一安装流程。多空间安装下它只是订阅列表里一条带 implicit 标记的订阅，UI 上不渲染为「空间」，而呈现为「单独添加的能力」分组。
-_Avoid_: 项目级游离能力、单能力旁路安装
+**能力集订阅（Capability Set Subscription）**:
+项目与能力集之间的一条安装关系。同步策略和目标厂商属于这条订阅，每个能力集可独立选择；共享能力按能力与厂商的组合计数引用。
+_Avoid_: 空间订阅、Workspace Subscription、安装实例、项目的 syncPolicy 字段
+
+**隐式能力集（Implicit Capability Set）**:
+单项能力直接添加到项目时所使用的内部能力组合。界面不把它展示为普通能力集，而呈现为「单独添加的能力」。
+_Avoid_: 隐式 Workspace、项目级游离能力、单能力旁路安装
 
 **能力共享（Asset Sharing）**:
 同一 asset id 被同一项目的多个订阅引用时，磁盘上只落一份，按订阅引用计数；卸载某订阅时仅当它是最后一个引用者才删除该能力文件。共享能力的开关/移除是**项目级**操作（磁盘只有一份，无法按订阅区别对待），对引用它的所有订阅同时生效。
-_Avoid_: 覆盖安装、按空间复制能力文件、订阅级开关
+_Avoid_: 覆盖安装、按能力集复制能力文件、订阅级开关
 
 **撞车裁决（Conflict Adjudication）**:
 同名不同 id 的能力落盘路径必然撞车，不属于能力共享。安装计划阶段以 conflict 报出，安装流程中逐条裁决：跳过该能力（仅本次不装，非永久排除）、全部跳过并继续、或取消安装。不静默覆盖。
@@ -66,7 +70,7 @@ _Avoid_: 下发目标
 
 **工具配置档（Tool Config Profile）**:
 用户保存的一套 Codex 或 Claude Code 用户级配置。配置档包含一个加密凭据（Codex API Key / Claude Auth Token）与该工具的非敏感配置字段；REST 只返回 `secretConfigured`，不返回明文。配置档不会随保存自动生效，必须显式选择在线设备下发。
-_Avoid_: 环境变量凭据、Workspace 配置（前者是单一凭据，后者面向项目能力安装）
+_Avoid_: 环境变量凭据、能力集配置（前者是单一凭据，后者面向项目能力安装）
 
 **工具配置下发（Tool Config Distribution）**:
 把工具配置档通过在线 Agent 合并写入设备当前用户的 `~/.codex/` 或 `~/.claude/`。文件不存在则创建；存在则只更新该配置档负责的键。每台设备每个工具只记录最近一次成功下发的配置档，重复下发即切换。删除服务端配置档不反向删除设备文件。

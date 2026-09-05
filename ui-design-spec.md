@@ -65,12 +65,12 @@
 |------|----------|----------|----------|
 | `/login` | `LoginPage` | 已登录自动跳 `/` | 普通路由 |
 | `/` | `HomePage` | 未登录可浏览 public | `KeepAlive` |
-| `/workspaces` | `WorkspaceListPage` | 未登录可浏览 public | `KeepAlive` |
+| `/capability-sets` | `CapabilitySetListPage` | 未登录可浏览 public | `KeepAlive` |
 | `/console` | `LocalConsolePage` | 需要登录 | `KeepAlive` |
 | `/docs` | `DocsPage` | 未登录可浏览 | `KeepAlive` |
 | `/settings` | `SettingsPage` | 需要登录 | `KeepAlive` |
-| `/workspaces/new` | `WorkspaceComposerPage` | 需要登录 | 普通路由 |
-| `/workspaces/:id/edit` | `WorkspaceComposerPage` | 需要登录 | 普通路由 |
+| `/capability-sets/new` | `CapabilitySetComposerPage` | 需要登录 | 普通路由 |
+| `/capability-sets/:id/edit` | `CapabilitySetComposerPage` | 需要登录 | 普通路由 |
 | `/assets/new` | `AssetComposerPage` | 需要登录 | 普通路由 |
 | `/assets/:id/edit` | `AssetComposerPage` | 需要登录 | 普通路由 |
 | `*` | `NotFound` | 需要登录区域内兜底 | 普通路由 |
@@ -78,7 +78,7 @@
 关键规则：
 
 - 主导航页使用 `KeepAlive`，切换 tab 时隐藏但不卸载，避免频繁重新请求。
-- `/`、`/workspaces`、`/docs` 是 public tab。
+- `/`、`/capability-sets`、`/docs` 是 public tab。
 - `/console`、`/settings`、编辑页是 protected path。
 - 大页面使用 `lazy()` 代码分割。
 
@@ -91,7 +91,7 @@
 结构：
 
 ```text
-Loom Logo  能力市场  工作空间  本地控制台  文档  [新建 ▾]  [头像/登录]
+Loom Logo  能力市场  能力集  本地控制台  文档  [新建 ▾]  [头像/登录]
 ```
 
 行为：
@@ -101,7 +101,7 @@ Loom Logo  能力市场  工作空间  本地控制台  文档  [新建 ▾]  [�
 - Logo 为蓝色圆角方块 + 白色编织 mark（三根经线 + 一根流动纬线，中间经线压在纬线之上形成 over-under-over 交替编织，呼应「Loom 织机」隐喻）+ Loom 文本。
 - `新建` 按钮是下拉菜单：
   - 新建能力 → 已登录跳 `/assets/new`，未登录跳 `/login`。
-  - 新建工作空间 → 已登录跳 `/workspaces/new`，未登录跳 `/login`。
+  - 新建能力集 → 已登录跳 `/capability-sets/new`，未登录跳 `/login`。
 - 已登录显示邮箱首字母头像（圆角方块），点击进入 `/settings`。
 - 未登录显示「登录」按钮。
 
@@ -163,13 +163,13 @@ Loom Logo  能力市场  工作空间  本地控制台  文档  [新建 ▾]  [�
 
 空态文案根据是否筛选、是否登录区分。
 
-## 7. 工作空间列表页
+## 7. 能力集列表页
 
-来源：`pages/WorkspaceListPage.tsx`、`components/WorkspaceCard.tsx`。
+来源：`pages/CapabilitySetListPage.tsx`、`components/CapabilitySetCard.tsx`。
 
 布局：
 
-- 顶部：搜索输入 + 可见性筛选（仅登录用户显示）+「新建工作空间」按钮。
+- 顶部：搜索输入 + 可见性筛选（仅登录用户显示）+「新建能力集」按钮。
 - 可见性筛选：全部 / 公开 / 个人。
 - 内容：响应式 3 列卡片网格。
 - 状态：skeleton、错误态、空态。
@@ -178,8 +178,8 @@ Loom Logo  能力市场  工作空间  本地控制台  文档  [新建 ▾]  [�
 
 - 搜索参数：`query`。
 - 可见性参数：`visibility`。
-- 点击卡片打开 `DetailPanel type="workspace"`。
-- 导入工作空间卡片显示导入人，并显示「第三方」标识；来源名称作为标识 tooltip。
+- 点击卡片打开 `DetailPanel type="capabilitySet"`。
+- 导入能力集卡片显示导入人，并显示「第三方」标识；来源名称作为标识 tooltip。
 - 关闭详情后刷新列表。
 
 ## 8. 详情面板
@@ -190,20 +190,20 @@ Loom Logo  能力市场  工作空间  本地控制台  文档  [新建 ▾]  [�
 
 - 以浮层形式打开，支持关闭。
 - Asset 模式：直接读取 `/assets/:id`，文件内容随详情返回。
-- Workspace 模式：读取 `/workspaces/:id`，初始只拿文件元信息；单文件内容按需请求 `/assets/:id/file?path=...` 并缓存。
-- Workspace 内 Asset 按 `ASSET_TYPES` 顺序分组，组内按稳定名称 `name` 排序并显示 `name`，避免目录语义受别名影响。
+- CapabilitySet 模式：读取 `/capability-sets/:id`，初始只拿文件元信息；单文件内容按需请求 `/assets/:id/file?path=...` 并缓存。
+- CapabilitySet 内 Asset 按 `ASSET_TYPES` 顺序分组，组内按稳定名称 `name` 排序并显示 `name`，避免目录语义受别名影响。
 - 左侧树面板宽度可拖拽调整，范围约 180–500px。
 
 ### 8.2 文件路径预览
 
-详情面板和工作空间画布都调用 `isAssetDirLayout()` 来判断目录/平铺布局，避免 UI 预览与 adapter 脱节。
+详情面板和能力集画布都调用 `isAssetDirLayout()` 来判断目录/平铺布局，避免 UI 预览与 adapter 脱节。
 
 ### 8.3 安装面板
 
 详情面板复用 `lib/installFlow.ts`：
 
-1. Workspace 安装：直接使用 `workspaceId`。
-2. 单 Asset 安装：先创建/复用项目隐式 Workspace。
+1. CapabilitySet 安装：直接使用 `capabilitySetId`。
+2. 单 Asset 安装：先创建/复用项目隐式 CapabilitySet。
 3. 调 `/install/plan` 生成计划。
 4. 调 `/install/execute` 执行安装。
 
@@ -246,21 +246,21 @@ Loom Logo  能力市场  工作空间  本地控制台  文档  [新建 ▾]  [�
 - 编辑态不能更改能力类型。
 - 保存成功后：新建跳 `/`；编辑返回上一页。
 
-## 10. 工作空间编排页
+## 10. 能力集编排页
 
-来源：`pages/WorkspaceComposerPage.tsx`、`components/AssetBrowser.tsx`、`components/WorkspaceCanvas.tsx`。
+来源：`pages/CapabilitySetComposerPage.tsx`、`components/AssetBrowser.tsx`、`components/CapabilitySetCanvas.tsx`。
 
 路由：
 
-- `/workspaces/new`
-- `/workspaces/:id/edit`
+- `/capability-sets/new`
+- `/capability-sets/:id/edit`
 
 布局：
 
 - 整页固定高度：`h-[calc(100vh-8rem)]`。
 - 外层白色圆角卡片，边框和 soft shadow。
 - 左侧固定宽 `360px`：能力浏览器。
-- 右侧：工作空间画布。
+- 右侧：能力集画布。
 
 左侧能力浏览器：
 
@@ -286,18 +286,18 @@ Loom Logo  能力市场  工作空间  本地控制台  文档  [新建 ▾]  [�
 
 ### 11.1 页面信息架构
 
-当前为多空间订阅版（ADR-0006）：
+当前为多能力集订阅版（ADR-0006）：
 
 - 顶部：driftCleared banner（如触发）。
 - 左侧：项目列表（每项目显示订阅摘要）。
 - 右上：项目 header（名称、状态、路径复制、重新扫描）。
-- 右中：**订阅条**——每条空间订阅一张卡（名称、留存徽标、auto/locked 切换、
+- 右中：**订阅条**——每条能力集订阅一张卡（名称、留存徽标、auto/locked 切换、
   目标厂商管理、⋯ 菜单含卸载/编辑/导出），隐式订阅呈现为「单独添加的能力」简卡，
-  末尾「+ 添加空间」入口卡。
+  末尾「+ 添加能力集」入口卡。
 - 右下：本地镜像，支持两种视图：
   - 按厂商横向 tab。
-  - 按能力矩阵（平铺，一行一能力；名称格渲染来源空间徽标，共享能力多个徽标；
-    可按来源空间过滤）。
+  - 按能力矩阵（平铺，一行一能力；名称格渲染来源能力集徽标，共享能力多个徽标；
+    可按来源能力集过滤）。
 
 ### 11.2 数据刷新
 
@@ -326,12 +326,12 @@ Loom Logo  能力市场  工作空间  本地控制台  文档  [新建 ▾]  [�
 
 ### 11.4 核心操作
 
-- 添加空间（装为一条新订阅；同名撞车在确认前逐条裁决：跳过该能力/全部跳过/取消）。
+- 添加能力集（装为一条新订阅；同名撞车在确认前逐条裁决：跳过该能力/全部跳过/取消）。
 - 添加能力。
-- 按订阅卸载工作空间（共享能力按引用计数保留）。
+- 按订阅卸载能力集（共享能力按引用计数保留）。
 - 订阅级 auto/locked 切换与目标厂商调整（在各订阅卡上）。
 - 编辑/导出等次级操作在订阅卡的 more 菜单中组织。
-- 单项能力 toggle / remove（项目级生效；共享能力给「同时被空间 X 引用」轻提示）。
+- 单项能力 toggle / remove（项目级生效；共享能力给「同时被能力集 X 引用」轻提示）。
 - 点击文件或目录打开 `PreviewPanel`。
 - Loom 管理文件可跳转 Asset 详情。
 
@@ -361,7 +361,7 @@ Loom Logo  能力市场  工作空间  本地控制台  文档  [新建 ▾]  [�
 ### 12.2 数据来源 Tab
 
 - 自动同步频率选项来自 `POLL_INTERVAL_OPTIONS`：5 分钟、30 分钟、1 小时、6 小时、1 天。
-- 来源列表显示同步状态点、名称、repo URL、能力数量、工作空间数量、上次同步时间、错误摘要。
+- 来源列表显示同步状态点、名称、repo URL、能力数量、能力集数量、上次同步时间、错误摘要。
 - 操作：刷新、日志、删除、添加来源。
 - 删除和添加通过独立 Dialog 完成。
 
@@ -436,12 +436,12 @@ UI 展示应以当前运行时 adapter 为准：
 | 组件 | 使用场景 |
 |------|----------|
 | `Button` | 主按钮、次按钮、ghost、loading、icon |
-| `SearchInput` | 能力/工作空间搜索和类型筛选 |
+| `SearchInput` | 能力/能力集搜索和类型筛选 |
 | `PageState` | loading、empty、error |
 | `Toast` | 操作结果反馈 |
 | `ConfirmDialog` | 删除、卸载、移除能力等确认 |
 | `Modal` | 通用弹窗 |
-| `DetailPanel` | Asset/Workspace 详情和安装 |
+| `DetailPanel` | Asset/CapabilitySet 详情和安装 |
 | `FileTree` / `ContentViewer` | 文件树和内容查看 |
 | `KeepAlive` | 主导航 tab 缓存 |
 
@@ -451,10 +451,10 @@ UI 展示应以当前运行时 adapter 为准：
 
 当前前端代码没有实现：
 
-- 全局公共/个人空间切换器。
+- 全局公共/个人能力集切换器。
 - 收藏、评分、评论、关注、推荐榜单。
 - 三方 diff UI。
-- 组织/团队空间。
+- 组织/团队能力集。
 - 资产风险等级、签名、安全扫描 UI。
 - `.agent` 目标工具 UI。
 - Web 任意输入本地路径接管项目。

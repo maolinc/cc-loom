@@ -2,6 +2,97 @@ import { db, vecAvailable } from "./index.js";
 import { hashPassword, generateId, verifyPassword } from "../lib/crypto.js";
 import { appSettings } from "../lib/app-settings.js";
 import { emailSchema, passwordPolicySchema } from "@maolinc/cc-loom-shared";
+import type { Database as DatabaseType } from "better-sqlite3";
+
+export function migrateCapabilitySetTerminology(database: DatabaseType): void {
+  const tableExists = (name: string) => Boolean(
+    database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name),
+  );
+  const columnExists = (table: string, column: string) =>
+    tableExists(table)
+    && (database.pragma(`table_info(${table})`) as Array<{ name: string }>).some((entry) => entry.name === column);
+
+  if (tableExists("workspaces") && !tableExists("capability_sets")) {
+    database.exec("ALTER TABLE workspaces RENAME TO capability_sets");
+  }
+  if (tableExists("workspace_assets") && !tableExists("capability_set_assets")) {
+    database.exec("ALTER TABLE workspace_assets RENAME TO capability_set_assets");
+  }
+
+  for (const [table, from, to] of [
+    ["projects", "current_workspace_id", "current_capability_set_id"],
+    ["project_subscriptions", "workspace_id", "capability_set_id"],
+    ["project_subscription_excludes", "workspace_id", "capability_set_id"],
+    ["capability_set_assets", "workspace_id", "capability_set_id"],
+  ] as const) {
+    if (columnExists(table, from) && !columnExists(table, to)) {
+      database.exec(`ALTER TABLE ${table} RENAME COLUMN ${from} TO ${to}`);
+    }
+  }
+
+  for (const index of [
+    "idx_workspaces_source",
+    "idx_workspaces_implicit_project",
+    "idx_workspaces_user_name",
+    "idx_projects_workspace",
+    "idx_workspace_assets_ws",
+    "idx_workspace_assets_asset",
+    "idx_subscriptions_workspace",
+    "idx_subscriptions_capabilitySet",
+    "idx_projects_capabilitySet",
+    "idx_capability_set_assets_ws",
+  ]) {
+    database.exec(`DROP INDEX IF EXISTS ${index}`);
+  }
+}
+
+export function migrateLegacyProjectSubscriptions(database: DatabaseType): void {
+  const projectColumns = new Set(
+    (database.pragma("table_info(projects)") as Array<{ name: string }>).map(({ name }) => name),
+  );
+  const legacyCapabilitySetColumn = projectColumns.has("current_capability_set_id")
+    ? "current_capability_set_id"
+    : projectColumns.has("current_workspace_id")
+      ? "current_workspace_id"
+      : null;
+  const capabilitySetExpression = legacyCapabilitySetColumn
+    ? `p.${legacyCapabilitySetColumn}`
+    : "NULL";
+  const policyExpression = projectColumns.has("sync_policy") ? "p.sync_policy" : "'auto'";
+  const rows = database.prepare(`
+    SELECT p.id AS project_id, ${capabilitySetExpression} AS capability_set_id, ${policyExpression} AS policy,
+           p.default_targets AS defaults, cs.target_tools AS capability_set_tools, p.registered_at AS at
+    FROM projects p LEFT JOIN capability_sets cs ON cs.id = ${capabilitySetExpression}
+  `).all() as {
+    project_id: string; capability_set_id: string | null; policy: string;
+    defaults: string; capability_set_tools: string | null; at: string;
+  }[];
+  const insertSubscription = database.prepare(
+    "INSERT OR IGNORE INTO project_subscriptions (project_id, capability_set_id, sync_policy, target_tools, installed_at) VALUES (?, ?, ?, ?, ?)",
+  );
+  for (const row of rows) {
+    insertSubscription.run(row.project_id, "", row.policy === "locked" ? "locked" : "auto", null, row.at);
+    if (row.capability_set_id) {
+      const defaults = JSON.parse(row.defaults || "[]") as string[];
+      const capabilitySetTools = row.capability_set_tools
+        ? (JSON.parse(row.capability_set_tools) as string[])
+        : defaults;
+      const effectiveTools = defaults.filter((tool) => capabilitySetTools.includes(tool));
+      insertSubscription.run(
+        row.project_id,
+        row.capability_set_id,
+        row.policy === "locked" ? "locked" : "auto",
+        JSON.stringify(effectiveTools.length > 0 ? effectiveTools : defaults),
+        row.at,
+      );
+    }
+  }
+
+  // 旧单值字段只作为迁移输入，领域真值已经转入 project_subscriptions。
+  for (const column of ["current_workspace_id", "current_capability_set_id", "sync_policy"]) {
+    if (projectColumns.has(column)) database.exec(`ALTER TABLE projects DROP COLUMN ${column}`);
+  }
+}
 
 function bootstrapAdmin(): void {
   const configuredEmail = process.env.LOOM_ADMIN_EMAIL?.trim();
@@ -51,6 +142,11 @@ function bootstrapAdmin(): void {
 }
 
 export function migrate() {
+  // Domain rename migration: existing installations used the ambiguous
+  // Workspace vocabulary. Rename storage in place before creating the new
+  // schema so all existing capability sets and subscriptions survive.
+  migrateCapabilitySetTerminology(db);
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -158,7 +254,7 @@ export function migrate() {
   try { db.exec(`ALTER TABLE assets DROP COLUMN content`); } catch { /* column may not exist */ }
 
   db.exec(`
-    CREATE TABLE IF NOT EXISTS workspaces (
+    CREATE TABLE IF NOT EXISTS capability_sets (
       id TEXT PRIMARY KEY,
       user_id TEXT REFERENCES users(id),
       name TEXT NOT NULL,
@@ -174,20 +270,20 @@ export function migrate() {
 
   // Migration: add user_id column if missing
   try {
-    db.exec(`ALTER TABLE workspaces ADD COLUMN user_id TEXT REFERENCES users(id)`);
+    db.exec(`ALTER TABLE capability_sets ADD COLUMN user_id TEXT REFERENCES users(id)`);
   } catch {/* column already exists */}
 
   db.exec(`
-    CREATE TABLE IF NOT EXISTS workspace_assets (
+    CREATE TABLE IF NOT EXISTS capability_set_assets (
       id TEXT PRIMARY KEY,
-      workspace_id TEXT NOT NULL REFERENCES workspaces(id),
+      capability_set_id TEXT NOT NULL REFERENCES capability_sets(id),
       asset_id TEXT NOT NULL REFERENCES assets(id)
     )
   `);
 
   // 项目安装账本：服务端镜像每个项目 agent lock 里实际安装的 asset 集合。
   // 由 ws gateway 在收到 agent 推送的 LocalProjectState 时对账维护，作为 asset
-  // 「留存 / GC」引用计数的权威来源（含通过「添加能力」单独安装、不入 workspace_assets 的能力）。
+  // 「留存 / GC」引用计数的权威来源（含通过「添加能力」单独安装、不入 capability_set_assets 的能力）。
   db.exec(`
     CREATE TABLE IF NOT EXISTS project_installed_assets (
       project_id   TEXT NOT NULL REFERENCES projects(id),
@@ -219,11 +315,11 @@ export function migrate() {
 
   // ---- project_capabilities：项目级直接成员（adopt 的本地外部能力）----
   //
-  // 与 workspace_assets（共享、受 sync 扇出）并列，但归属单个项目、不扇出到其它项目。
+  // 与 capability_set_assets（共享、受 sync 扇出）并列，但归属单个项目、不扇出到其它项目。
   // 当用户在本地控制台 toggle/remove 一个「外部能力」时，先 adopt：把磁盘内容登记成
   // asset，再加入本表，使其进入 reconcile 受管集。单独安装（type 2）也走本表
   // （/capabilities/add 加入 project_capabilities，per-project 不扇出）。reconcile 受管集 =
-  // workspace_assets(current_workspace) ∪ project_capabilities(project)。
+  // capability_set_assets(所有显式订阅) ∪ project_capabilities(project)。
   db.exec(`
     CREATE TABLE IF NOT EXISTS project_capabilities (
       project_id TEXT NOT NULL REFERENCES projects(id),
@@ -244,74 +340,45 @@ export function migrate() {
       registered_at TEXT NOT NULL,
       detected_targets TEXT NOT NULL,
       default_targets TEXT NOT NULL,
-      current_workspace_id TEXT,
       status TEXT NOT NULL DEFAULT 'registered'
     )
   `);
-  // 安装时选择的同步策略（auto / locked），用于服务端在工作空间/能力被编辑时
-  // 决定是否自动回推到该项目。安装成功时写入；默认 auto。
-  // ADR-0006 起语义迁移到 project_subscriptions.sync_policy，本列仅为迁移来源保留。
-  try {
-    db.exec(`ALTER TABLE projects ADD COLUMN sync_policy TEXT NOT NULL DEFAULT 'auto'`);
-  } catch {/* column already exists */}
 
-  // ---- project_subscriptions：项目 × 工作空间的订阅关系（ADR-0006）----
+  // ---- project_subscriptions：项目 × 能力集的订阅关系（ADR-0006）----
   //
-  // 取代 projects.current_workspace_id / projects.sync_policy 的单值模型。一个项目
+  // 取代 projects 旧能力集 id / sync_policy 的单值模型。一个项目
   // 可同时持有多条订阅，能力叠加生效；syncPolicy 与 targetTools 均挂在订阅上。
-  // workspace_id = '' 为隐式订阅哨兵（「单独添加的能力」组，对应 project_capabilities；
+  // capability_set_id = '' 为隐式订阅哨兵（「单独添加的能力」组，对应 project_capabilities；
   // SQLite PK 中 NULL 不判重，故用空串）。隐式订阅 target_tools = NULL（跟随项目有效工具）。
-  // workspace_id 不设外键：留存空间被 workspace-gc 硬删后订阅行仍指向其 id。
+  // capability_set_id 不设外键：留存能力集被 capability-set-gc 硬删后订阅行仍指向其 id。
   db.exec(`
     CREATE TABLE IF NOT EXISTS project_subscriptions (
       project_id   TEXT NOT NULL REFERENCES projects(id),
-      workspace_id TEXT NOT NULL,
+      capability_set_id TEXT NOT NULL,
       sync_policy  TEXT NOT NULL DEFAULT 'auto',
       target_tools TEXT,
       installed_at TEXT NOT NULL,
-      PRIMARY KEY (project_id, workspace_id)
+      PRIMARY KEY (project_id, capability_set_id)
     )
   `);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_subscriptions_workspace ON project_subscriptions(workspace_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_subscriptions_capability_set ON project_subscriptions(capability_set_id)`);
 
   // 撞车裁决（ADR-0006）：同名不同 id 的能力在安装时被用户「跳过」的记录。
-  // reconcile 计算受管集时从该订阅的 workspace_assets 中剔除这些 asset。
+  // reconcile 计算受管集时从该订阅的 capability_set_assets 中剔除这些 asset。
   // 跳过 = 仅本次不装；execute 携带新的 skipAssetIds 时整组替换，支持后续补齐。
   db.exec(`
     CREATE TABLE IF NOT EXISTS project_subscription_excludes (
       project_id   TEXT NOT NULL REFERENCES projects(id),
-      workspace_id TEXT NOT NULL,
+      capability_set_id TEXT NOT NULL,
       asset_id     TEXT NOT NULL,
-      PRIMARY KEY (project_id, workspace_id, asset_id)
+      PRIMARY KEY (project_id, capability_set_id, asset_id)
     )
   `);
 
-  // 迁移：projects.current_workspace_id / sync_policy → 订阅行。
-  // 显式订阅的 target_tools 取迁移时有效值（default_targets ∩ workspace.target_tools），
+  // 迁移：projects 的旧单能力集字段 / sync_policy → 订阅行。
+  // 显式订阅的 target_tools 取迁移时有效值（default_targets ∩ capability_set.target_tools），
   // 与旧 reconcile 口径一致；隐式订阅为所有项目补一行（承载原项目级 sync_policy）。
-  {
-    const rows = db.prepare(`
-      SELECT p.id AS project_id, p.current_workspace_id AS ws, p.sync_policy AS policy,
-             p.default_targets AS defaults, w.target_tools AS ws_tools, p.registered_at AS at
-      FROM projects p LEFT JOIN workspaces w ON w.id = p.current_workspace_id
-    `).all() as {
-      project_id: string; ws: string | null; policy: string;
-      defaults: string; ws_tools: string | null; at: string;
-    }[];
-    const ins = db.prepare(
-      "INSERT OR IGNORE INTO project_subscriptions (project_id, workspace_id, sync_policy, target_tools, installed_at) VALUES (?, ?, ?, ?, ?)",
-    );
-    for (const r of rows) {
-      ins.run(r.project_id, "", r.policy === "locked" ? "locked" : "auto", null, r.at);
-      if (r.ws) {
-        const defaults = JSON.parse(r.defaults || "[]") as string[];
-        const wsTools = r.ws_tools ? (JSON.parse(r.ws_tools) as string[]) : defaults;
-        const eff = defaults.filter((t) => wsTools.includes(t));
-        ins.run(r.project_id, r.ws, r.policy === "locked" ? "locked" : "auto",
-          JSON.stringify(eff.length > 0 ? eff : defaults), r.at);
-      }
-    }
-  }
+  migrateLegacyProjectSubscriptions(db);
 
   // Marketplace sources
   db.exec(`
@@ -437,27 +504,27 @@ export function migrate() {
     }
   } catch { /* 列不存在或已迁移——忽略 */ }
 
-  // Extend workspaces table
+  // Extend capability_sets table
   for (const stmt of [
-    `ALTER TABLE workspaces ADD COLUMN source_id TEXT REFERENCES marketplace_sources(id) ON DELETE CASCADE`,
-    `ALTER TABLE workspaces ADD COLUMN source_plugin TEXT`,
-    // 隐式工作空间绑定：本地控制台对「未安装工作空间」项目「直接添加能力」时，
-    // 自动创建并绑定到该项目的隐式工作空间。每项目至多一个（见下方部分唯一索引）。
-    `ALTER TABLE workspaces ADD COLUMN implicit_project_id TEXT`,
+    `ALTER TABLE capability_sets ADD COLUMN source_id TEXT REFERENCES marketplace_sources(id) ON DELETE CASCADE`,
+    `ALTER TABLE capability_sets ADD COLUMN source_plugin TEXT`,
+    // 隐式能力集绑定：本地控制台对「未安装能力集」项目「直接添加能力」时，
+    // 自动创建并绑定到该项目的隐式能力集。每项目至多一个（见下方部分唯一索引）。
+    `ALTER TABLE capability_sets ADD COLUMN implicit_project_id TEXT`,
   ]) {
     try { db.exec(stmt); } catch {/* column exists */}
   }
   try {
-    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_workspaces_source ON workspaces(source_id, source_plugin) WHERE source_id IS NOT NULL`);
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_capability_sets_source ON capability_sets(source_id, source_plugin) WHERE source_id IS NOT NULL`);
   } catch {/* exists */}
   try {
-    // 每项目至多一个「未软删」的隐式工作空间。软删行被排除，删除后可重新创建。
-    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_workspaces_implicit_project ON workspaces(implicit_project_id) WHERE implicit_project_id IS NOT NULL AND deleted_at IS NULL`);
+    // 每项目至多一个「未软删」的隐式能力集。软删行被排除，删除后可重新创建。
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_capability_sets_implicit_project ON capability_sets(implicit_project_id) WHERE implicit_project_id IS NOT NULL AND deleted_at IS NULL`);
   } catch {/* exists */}
   try {
-    // 同一用户不能创建相同名字的工作空间（软删的不参与约束，名字可复用）。
+    // 同一用户不能创建相同名字的能力集（软删的不参与约束，名字可复用）。
     // loom push 的覆盖语义依赖此约束：按 (user_id, name) 查找至多一条结果。
-    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_workspaces_user_name ON workspaces(user_id, name) WHERE deleted_at IS NULL`);
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_capability_sets_user_name ON capability_sets(user_id, name) WHERE deleted_at IS NULL`);
   } catch {/* exists */}
 
   // ---- Performance indexes ----
@@ -465,12 +532,10 @@ export function migrate() {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_projects_user_status ON projects(user_id, status)`);
   // projects: agent 连接/断开时按 device_id 批量更新
   db.exec(`CREATE INDEX IF NOT EXISTS idx_projects_device ON projects(device_id)`);
-  // projects: auto-sync 按 workspace 查项目
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_projects_workspace ON projects(current_workspace_id)`);
-  // workspace_assets: workspace 详情/列表必用
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_workspace_assets_ws ON workspace_assets(workspace_id)`);
-  // workspace_assets: asset GC 引用计数
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_workspace_assets_asset ON workspace_assets(asset_id)`);
+  // capability_set_assets: 能力集详情/列表必用
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_capability_set_assets_capability_set ON capability_set_assets(capability_set_id)`);
+  // capability_set_assets: asset GC 引用计数
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_capability_set_assets_asset ON capability_set_assets(asset_id)`);
   // devices: 设备列表按用户查
   db.exec(`CREATE INDEX IF NOT EXISTS idx_devices_user ON devices(user_id)`);
 

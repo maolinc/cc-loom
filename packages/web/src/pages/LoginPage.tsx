@@ -7,7 +7,7 @@ import Logo from "../components/Logo.js";
 
 const HIGHLIGHTS = [
   { icon: Sparkles, title: "统一能力注册", desc: "Skill、Rule、MCP、Hook、Command、Agent 一处发现与管理。" },
-  { icon: Boxes, title: "工作空间组合", desc: "把常用能力打包复用，一次安装到多个 AI 工具目录。" },
+  { icon: Boxes, title: "能力集组合", desc: "把常用能力打包复用，一次安装到多个 AI 工具目录。" },
   { icon: TerminalSquare, title: "本地落地闭环", desc: "通过本地 Agent 安全写入 .cursor / .codebuddy / .claude 等目录。" },
 ];
 

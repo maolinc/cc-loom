@@ -24,14 +24,14 @@ test.describe("能力市场 + 导航", () => {
     }
   });
 
-  test("导航到工作空间页 → 显示工作空间列表", async ({ page }) => {
+  test("导航到能力集页 → 显示能力集列表", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
-    const wsLink = page.locator('a[href="/workspaces"]').first();
+    const wsLink = page.locator('a[href="/capability-sets"]').first();
     if (await wsLink.isVisible()) {
       await wsLink.click();
-      await page.waitForURL("/workspaces", { timeout: 5000 });
+      await page.waitForURL("/capability-sets", { timeout: 5000 });
       await expect(page.locator("body")).not.toBeEmpty();
     }
   });

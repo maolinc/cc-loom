@@ -9,7 +9,7 @@
  *   - 白名单开启后非白名单拒绝登录（admin 豁免）
  *   - 注册上限达上限拒绝新注册（admin 豁免）
  *   - 停用用户无法登录、会话立即失效
- *   - admin 可编辑/删除任意用户的 asset/workspace
+ *   - admin 可编辑/删除任意用户的 asset/capabilitySet
  *   - admin 不能停用自己、不能取消自己的 admin 角色
  */
 import { describe, it, expect, afterEach } from "vitest";
@@ -511,13 +511,13 @@ describe("L3 admin", () => {
     expect(delRes.status).toBe(200);
   });
 
-  it("admin can edit another user's workspace", async () => {
+  it("admin can edit another user's capabilitySet", async () => {
     server = await startServer();
     adminCookie = await login(server.baseUrl, ADMIN_EMAIL, ADMIN_PASSWORD);
 
-    // 普通用户创建 workspace
+    // 普通用户创建 capabilitySet
     const userCookie = await login(server.baseUrl, "wsowner@example.com");
-    const createRes = await request(server.baseUrl, "POST", "/api/workspaces", {
+    const createRes = await request(server.baseUrl, "POST", "/api/capability-sets", {
       cookie: userCookie,
       body: {
         name: "admin-ws-edit",
@@ -529,7 +529,7 @@ describe("L3 admin", () => {
     const ws = (await parseJson<any>(createRes)).data;
 
     // admin 编辑
-    const editRes = await request(server.baseUrl, "PUT", `/api/workspaces/${ws.id}`, {
+    const editRes = await request(server.baseUrl, "PUT", `/api/capability-sets/${ws.id}`, {
       cookie: adminCookie,
       body: { description: "admin edited" },
     });
@@ -537,12 +537,12 @@ describe("L3 admin", () => {
     expect((await parseJson<any>(editRes)).data.description).toBe("admin edited");
   });
 
-  it("admin can delete another user's workspace", async () => {
+  it("admin can delete another user's capabilitySet", async () => {
     server = await startServer();
     adminCookie = await login(server.baseUrl, ADMIN_EMAIL, ADMIN_PASSWORD);
 
     const userCookie = await login(server.baseUrl, "wsdelowner@example.com");
-    const createRes = await request(server.baseUrl, "POST", "/api/workspaces", {
+    const createRes = await request(server.baseUrl, "POST", "/api/capability-sets", {
       cookie: userCookie,
       body: {
         name: "admin-ws-del",
@@ -553,7 +553,7 @@ describe("L3 admin", () => {
     });
     const ws = (await parseJson<any>(createRes)).data;
 
-    const delRes = await request(server.baseUrl, "DELETE", `/api/workspaces/${ws.id}`, { cookie: adminCookie });
+    const delRes = await request(server.baseUrl, "DELETE", `/api/capability-sets/${ws.id}`, { cookie: adminCookie });
     expect(delRes.status).toBe(200);
   });
 

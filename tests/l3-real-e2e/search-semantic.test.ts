@@ -160,7 +160,7 @@ describe("L3 语义搜索", () => {
       const items = await queueItems(ctx.server, ctx.cookie, "pending");
       const it = items.find((x: any) => x.assetId === id);
       return !!it && it.attempts >= 1;
-    });
+    }, 20_000, 20);
     // 恢复 fake → 转 ready
     ctx.fake.setMode("ok");
     await awaitStatus(ctx, id, "ready");

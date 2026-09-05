@@ -91,7 +91,7 @@ describe("L3 unregister-watcher: 注销后停止监听项目文件", () => {
     const token = await api.getCliToken();
 
     const skill = await api.createAsset(assetBuilders.skill("unreg-watch-skill", ["cursor"]));
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "ws-unreg-watch", description: "unregister watcher", targetTools: ["cursor"], visibility: "public" },
       [skill.id],
     );
@@ -109,7 +109,7 @@ describe("L3 unregister-watcher: 注销后停止监听项目文件", () => {
     const projectId = agent.projectId;
 
     await api.installExecute({
-      projectId, workspaceId: ws.id, targetTools: ["cursor"], policy: "locked",
+      projectId, capabilitySetId: ws.id, targetTools: ["cursor"], policy: "locked",
     });
     expectFileExists(projectRoot, ".cursor/skills/unreg-watch-skill/SKILL.md");
 

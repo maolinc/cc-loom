@@ -61,14 +61,14 @@ describe("L3 install plan — sourcePath 透传", () => {
     expect(brainstorming).toBeDefined();
     expect(brainstorming!.sourcePath).toBeTruthy();
 
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "ws-plan", description: "x", targetTools: ["cursor"], visibility: "private" },
       [brainstorming!.id],
     );
     const projectId = await startProj(token);
 
     const plan = await api.installPlan({
-      projectId, workspaceId: ws.id, targetTools: ["cursor"], policy: "auto",
+      projectId, capabilitySetId: ws.id, targetTools: ["cursor"], policy: "auto",
     });
     const paths = plan.diff.map((e: any) => e.path);
     expect(paths).toContain(".cursor/skills/Brainstorming/SKILL.md");
@@ -87,14 +87,14 @@ describe("L3 install plan — sourcePath 透传", () => {
       files: [{ path: "anything.md", content: "x" }],
       compatibleTools: ["cursor"], visibility: "public", metadata: { globs: ["**/*.ts"] },
     });
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "ws-rule", description: "x", targetTools: ["cursor"], visibility: "private" },
       [rule.id],
     );
     const projectId = await startProj(token);
 
     const plan = await api.installPlan({
-      projectId, workspaceId: ws.id, targetTools: ["cursor"], policy: "auto",
+      projectId, capabilitySetId: ws.id, targetTools: ["cursor"], policy: "auto",
     });
     const paths = plan.diff.map((e: any) => e.path);
     expect(paths).toContain(".cursor/rules/my-rule.md");
@@ -106,14 +106,14 @@ describe("L3 install plan — sourcePath 透传", () => {
     const gitHint = assets.find((a: any) => a.name === "git-hint" && a.type === "hook");
     expect(gitHint).toBeDefined();
 
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "ws-hook", description: "x", targetTools: ["claudecode"], visibility: "private" },
       [gitHint!.id],
     );
     const projectId = await startProj(token);
 
     const plan = await api.installPlan({
-      projectId, workspaceId: ws.id, targetTools: ["claudecode"], policy: "auto",
+      projectId, capabilitySetId: ws.id, targetTools: ["claudecode"], policy: "auto",
     });
     const paths = plan.diff.map((e: any) => e.path);
     expect(paths).toContain(".claude/hooks/git-hint/hint.sh");

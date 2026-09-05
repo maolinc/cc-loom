@@ -81,14 +81,14 @@ describe("L3 security: 路径穿越 / XSS 存储", () => {
         },
       });
 
-      const ws = await api.createWorkspace(
+      const ws = await api.createCapabilitySet(
         { name: "ws-sec", description: "test", targetTools: ["cursor"], visibility: "public" },
         [assetId],
       );
 
       await api.installExecute({
         projectId: agent.projectId,
-        workspaceId: ws.id,
+        capabilitySetId: ws.id,
         targetTools: ["cursor"],
         policy: "locked",
       });

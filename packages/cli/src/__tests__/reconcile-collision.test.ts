@@ -19,7 +19,7 @@ function makeReq(plan: ReconcilePlan, opts: Partial<WsReconcileRequest> = {}): W
   return {
     requestId: "req-coll",
     projectId: PROJECT_ID,
-    subscriptions: opts.subscriptions ?? [{ workspaceId: "ws-coll", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
+    subscriptions: opts.subscriptions ?? [{ capabilitySetId: "ws-coll", syncPolicy: "auto" as const, targetTools: null, installedAt: "2026-01-01T00:00:00Z" }],
     targetTools: opts.targetTools ?? ["cursor"],
     plan,
   };
@@ -70,7 +70,7 @@ describe("诊断：能力安装碰撞行为", () => {
     expect(readLock(PROJECT_ID)!.assets["a1"]).toBeDefined();
   });
 
-  // 场景 B：两个同名 asset（不同来源，如 workspace + project_capability）落到同一路径。
+  // 场景 B：两个同名 asset（不同来源，如 capabilitySet + project_capability）落到同一路径。
   it("B. 两个同名能力同路径 → 后写者覆盖，无冲突报错（顺序依赖）", () => {
     const { errors } = applyReconcilePlan(makeReq({
       enabled: [

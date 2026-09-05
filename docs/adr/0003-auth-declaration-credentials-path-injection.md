@@ -18,7 +18,7 @@
 
 7. **显式分发，与 `env_vars` 同构。** 凭据值不会在配置时自动下发到项目；用户在设置页显式「选项目下发」（opt-in），记录在 `credential_distributions`（credentialName × projectId，镜像 `env_var_distributions`）。reconcile 渲染路径绑定时，**仅当** `(credentialName, projectId)` 已在分发表 → 写真实值；否则保留作者原始叶子。轮换 = 更新值 + re-enqueue 已分发的项目；取消分发 = 删分发记录 + re-enqueue → 作者叶子回归。这与「不在安装时写值、需用户去设置页手动操作」的产品取舍一致——安装只负责把声明落地，值的注入是用户主动行为。
 
-8. **使用关系记录：reconcile-end 钩子，insert-only 超+移除时删。** 用户×项目×已装 MCP×path 绑定的使用记录由单个钩子维护：每次 reconcile 完成时对受影响资产 upsert 其当前 binding 行（INSERT OR IGNORE，超集，保证轮换不漏项目），MCP 从项目移除时删其行。空间直接安装/卸载、能力 enable/disable 都收敛到同一个 reconcile 钩子，不可能漏某个路径。偏差窗口 = 「权威变更 → 下次 reconcile」，与磁盘 `.mcp.json` 陈旧窗口重合，两者不会长时背离。
+8. **使用关系记录：reconcile-end 钩子，insert-only 超+移除时删。** 用户×项目×已装 MCP×path 绑定的使用记录由单个钩子维护：每次 reconcile 完成时对受影响资产 upsert 其当前 binding 行（INSERT OR IGNORE，超集，保证轮换不漏项目），MCP 从项目移除时删其行。能力集直接安装/卸载、能力 enable/disable 都收敛到同一个 reconcile 钩子，不可能漏某个路径。偏差窗口 = 「权威变更 → 下次 reconcile」，与磁盘 `.mcp.json` 陈旧窗口重合，两者不会长时背离。
 
 9. **env 与 path 统一到同一凭据存储。** `kind:"env"` 与 `kind:"path"` 共用 `credentials`（值存储）+ `credential_distributions`（显式分发）。现有 `env_vars` / `env_var_distributions` 迁移进统一表。两者分发维度不同：env = credential × device（推送系统环境变量，走 `env:push`），path = credential × project（写进项目 `.mcp.json`）。维度差异记录在分发记录的目标字段，不破坏统一存储。`credentialName` 成为 env 与 path 共一的链接键，消除今天 env 绑定与值之间的隐式同名匹配。
 

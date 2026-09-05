@@ -128,13 +128,13 @@ describe("L3 path auth injection", () => {
     const dist = await api.distributeCredential(cred.id, "path", [projectId]);
     expect(dist.pushed).toHaveLength(1);
 
-    // 安装该 MCP（workspace 形态）
-    const ws = await api.createWorkspace(
+    // 安装该 MCP（capabilitySet 形态）
+    const ws = await api.createCapabilitySet(
       { name: "tapd-ws", description: "ws", targetTools: ["claudecode"], visibility: "public" },
       [assetId],
     );
     const { result } = await api.installExecute({
-      projectId, workspaceId: ws.id, targetTools: ["claudecode"], policy: "auto",
+      projectId, capabilitySetId: ws.id, targetTools: ["claudecode"], policy: "auto",
     });
     expect(result.success).toBe(true);
 
@@ -155,12 +155,12 @@ describe("L3 path auth injection", () => {
     const dist = await api.distributeCredential(cred.id, "path", [projectId]);
     expect(dist.pushed).toHaveLength(1);
 
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "tapd-ws-wrapped", description: "ws", targetTools: ["claudecode"], visibility: "public" },
       [assetId],
     );
     const { result } = await api.installExecute({
-      projectId, workspaceId: ws.id, targetTools: ["claudecode"], policy: "auto",
+      projectId, capabilitySetId: ws.id, targetTools: ["claudecode"], policy: "auto",
     });
     expect(result.success).toBe(true);
 
@@ -179,12 +179,12 @@ describe("L3 path auth injection", () => {
     const { projectId } = await setup();
     const assetId = await createTapdAsset();
     // 不创建凭据、不分发，直接安装
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "tapd-ws2", description: "ws", targetTools: ["claudecode"], visibility: "public" },
       [assetId],
     );
     const { result } = await api.installExecute({
-      projectId, workspaceId: ws.id, targetTools: ["claudecode"], policy: "auto",
+      projectId, capabilitySetId: ws.id, targetTools: ["claudecode"], policy: "auto",
     });
     expect(result.success).toBe(true);
 
@@ -201,11 +201,11 @@ describe("L3 path auth injection", () => {
     const cred = await api.createCredential("tapd-token", "tok_rotate_me", "path");
     await api.distributeCredential(cred.id, "path", [projectId]);
 
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "tapd-ws3", description: "ws", targetTools: ["claudecode"], visibility: "public" },
       [assetId],
     );
-    await api.installExecute({ projectId, workspaceId: ws.id, targetTools: ["claudecode"], policy: "auto" });
+    await api.installExecute({ projectId, capabilitySetId: ws.id, targetTools: ["claudecode"], policy: "auto" });
     expectFileContains(projectRoot!, ".mcp.json", "tok_rotate_me");
 
     // 取消 path 分发 → re-enqueue 回退作者叶子
@@ -233,11 +233,11 @@ describe("L3 path auth injection", () => {
     const cred = await api.createCredential("tapd-token", "tok_v1", "path");
     await api.distributeCredential(cred.id, "path", [projectId]);
 
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "tapd-ws4", description: "ws", targetTools: ["claudecode"], visibility: "public" },
       [assetId],
     );
-    await api.installExecute({ projectId, workspaceId: ws.id, targetTools: ["claudecode"], policy: "auto" });
+    await api.installExecute({ projectId, capabilitySetId: ws.id, targetTools: ["claudecode"], policy: "auto" });
     expectFileContains(projectRoot!, ".mcp.json", "tok_v1");
 
     // 更新值 → 轮换

@@ -7,7 +7,7 @@ import FileTree from "./FileTree.js";
 import ToolIcon from "./ToolIcon.js";
 
 /**
- * Visible label for an asset-type group in the workspace tree.
+ * Visible label for an asset-type group in the capability set tree.
  * MCP has no own subdirectory (ASSET_TYPE_DIRS.mcp === "") because installs
  * merge all MCP entries into a single mcp.json. Fall back to the type label
  * so the group header doesn't render blank.
@@ -30,7 +30,7 @@ interface Props {
   onPreview?: (id: string) => void;
 }
 
-export default function WorkspaceCanvas({
+export default function CapabilitySetCanvas({
   name, onNameChange,
   description, onDescriptionChange,
   targetTools, onTargetToolsChange,
@@ -111,7 +111,7 @@ export default function WorkspaceCanvas({
             <input
               value={name}
               onChange={(e) => onNameChange(e.target.value)}
-              placeholder="工作空间名称"
+              placeholder="能力集名称"
               className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-brand bg-white"
             />
           </div>
@@ -120,7 +120,7 @@ export default function WorkspaceCanvas({
             <textarea
               value={description}
               onChange={(e) => onDescriptionChange(e.target.value)}
-              placeholder="描述这个工作空间的用途"
+              placeholder="描述这个能力集的用途"
               rows={2}
               className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-brand resize-none bg-white"
             />

@@ -3,7 +3,7 @@
  *
  * 用 createGitFixture 把 fixture 目录变成真 git 仓库，server 的 git-runner 真
  * clone/fetch（非 in-process override）。bump SHA = 真提交。
- * 不变量: 鉴权、add/refresh/delete/list/logs、cascade、keepAssets、plugin→workspace。
+ * 不变量: 鉴权、add/refresh/delete/list/logs、cascade、keepAssets、plugin→capabilitySet。
  */
 import { describe, it, expect, afterEach } from "vitest";
 import {
@@ -160,14 +160,14 @@ describe("L3 marketplace HTTP", () => {
       expect(await api.listAssets()).toHaveLength(0);
     });
 
-    it("keepAssets=false succeeds when a source asset is pinned to a user workspace", async () => {
-      // 回归: workspace_assets 引用 assets(id) 无 ON DELETE CASCADE，源删除曾触发 FK 违例。
+    it("keepAssets=false succeeds when a source asset is pinned to a user capabilitySet", async () => {
+      // 回归: capability_set_assets 引用 assets(id) 无 ON DELETE CASCADE，源删除曾触发 FK 违例。
       await boot();
       const id = (await adminApi.addMarketplace(fx!.url)).id;
       const assets = await api.listAssets();
       const sourceAsset = assets[0];
 
-      await api.createWorkspace(
+      await api.createCapabilitySet(
         { name: "user-ws", description: "pins a marketplace asset", targetTools: ["claudecode"], visibility: "private" },
         [sourceAsset.id],
       );
@@ -253,17 +253,17 @@ describe("L3 marketplace HTTP", () => {
     });
   });
 
-  describe("Plugin → Workspace generation", () => {
-    it("creates a Workspace when source is a Claude Code plugin", async () => {
+  describe("Plugin → CapabilitySet generation", () => {
+    it("creates a CapabilitySet when source is a Claude Code plugin", async () => {
       await boot(FIXTURE_CC_PLUGIN);
       const source = await adminApi.addMarketplace(fx!.url);
 
       const list = await adminApi.listMarketplaces();
       const src = list.find((s) => s.id === source.id)!;
-      expect(src.workspaceCount).toBe(1);
+      expect(src.capabilitySetCount).toBe(1);
 
-      const workspaces = await api.listWorkspaces();
-      const plugin = workspaces.find((w) => w.name === "example-plugin");
+      const capability_sets = await api.listCapabilitySets();
+      const plugin = capability_sets.find((w) => w.name === "example-plugin");
       expect(plugin).toBeDefined();
       expect(plugin!.version).toBe("1.2.3");
     });
@@ -284,9 +284,9 @@ describe("L3 marketplace HTTP", () => {
       const source = await adminApi.addMarketplace(fx!.url);
 
       expect(source.assetCount).toBe(1);
-      expect(source.workspaceCount).toBe(1);
+      expect(source.capabilitySetCount).toBe(1);
       expect((await api.listAssets()).map((asset) => `${asset.type}:${asset.name}`)).toEqual(["skill:flyai"]);
-      expect((await api.listWorkspaces()).some((workspace) => workspace.name === "flyai")).toBe(true);
+      expect((await api.listCapabilitySets()).some((capabilitySet) => capabilitySet.name === "flyai")).toBe(true);
     });
   });
 });

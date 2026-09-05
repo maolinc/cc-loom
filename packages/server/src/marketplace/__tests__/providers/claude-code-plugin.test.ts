@@ -91,7 +91,7 @@ describe("claudeCodePluginProvider", () => {
       expect(result.childSources).toHaveLength(0);
     });
 
-    it("produces a Workspace named after the marketplace plugin entry", async () => {
+    it("produces a CapabilitySet named after the marketplace plugin entry", async () => {
       const result = await claudeCodePluginProvider.parse(SELF);
       expect(result.plugins[0]!.pluginName).toBe("selfplugin");
       expect(result.plugins[0]!.version).toBe("9.9.9");

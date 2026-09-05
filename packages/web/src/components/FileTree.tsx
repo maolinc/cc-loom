@@ -72,7 +72,7 @@ export default function FileTree({ files, activePath, onSelect, defaultCollapsed
   const [collapsed, setCollapsed] = useState<Set<string>>(initialCollapsed);
 
   // Re-seed collapse state when the input file list changes (e.g. user adds an
-  // asset to a workspace) so newly-introduced folders honor defaultCollapsed.
+  // asset to a capability set) so newly-introduced folders honor defaultCollapsed.
   const lastSeed = useRef(initialCollapsed);
   if (lastSeed.current !== initialCollapsed) {
     lastSeed.current = initialCollapsed;

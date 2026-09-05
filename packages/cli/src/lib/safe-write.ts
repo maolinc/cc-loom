@@ -146,7 +146,7 @@ export function removeIfExists(abs: string): void {
  * 删除某个相对项目根的文件，并把空了的父目录一路向上清掉，直到遇到非空目录或
  * 走出项目根（含 ALLOWED_TOP_DIRS 顶层本身）。
  *
- * 解决症状：切换 / 卸载 Workspace 后，文件被清掉但 `.cursor/skills/`、
+ * 解决症状：切换 / 卸载 CapabilitySet 后，文件被清掉但 `.cursor/skills/`、
  * `.cursor/rules/typescript/` 等空目录仍残留，scanner 会把它们以「(空)」形态
  * 渲染到 UI 上，给人「还有内容」的错觉。
  *

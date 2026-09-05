@@ -1,7 +1,7 @@
 /**
  * L3 sync-outbox 路由（项目维度）— 真实 server + 真实 HTTP。
  *
- * outbox 行通过真实流程产生（auto 项目 + 离线期间 workspace 编辑 → enqueue）。
+ * outbox 行通过真实流程产生（auto 项目 + 离线期间 capabilitySet 编辑 → enqueue）。
  * 断言走 HTTP 响应（list / stats / retry / discard 的可观测出口），不直查 DB、
  * 不直调 enqueueReconcile。
  *
@@ -50,22 +50,22 @@ describe("L3 sync-outbox routes", () => {
   }
 
   async function makePendingRow(projectId: string): Promise<number> {
-    // auto 项目 + 离线期间 workspace 编辑 → 入队一条 pending reconcile 行
+    // auto 项目 + 离线期间 capabilitySet 编辑 → 入队一条 pending reconcile 行
     const a1 = await api.createAsset(assetBuilders.skill("ob-a", ["cursor"]));
     const a2 = await api.createAsset(assetBuilders.skill("ob-b", ["cursor"]));
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "ws-ob", description: "x", targetTools: ["cursor"], visibility: "private" }, [a1.id],
     );
-    await api.installExecute({ projectId, workspaceId: ws.id, targetTools: ["cursor"], policy: "auto" });
+    await api.installExecute({ projectId, capabilitySetId: ws.id, targetTools: ["cursor"], policy: "auto" });
 
-    // 停 agent（离线），编辑空间 → 入队 pending 行（不消费）
+    // 停 agent（离线），编辑能力集 → 入队 pending 行（不消费）
     await stopAgent(agent!);
     agent = null;
     for (let i = 0; i < 20; i++) {
       if (!(await api.listDevices()).some((d) => d.status === "online")) break;
       await new Promise((r) => setTimeout(r, 300));
     }
-    await api.updateWorkspace(ws.id, { assetIds: [a1.id, a2.id] });
+    await api.updateCapabilitySet(ws.id, { assetIds: [a1.id, a2.id] });
 
     // 取 pending 行 id
     const rows = await api.get<any[]>(`/api/projects/${projectId}/sync-outbox`);

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import Fastify, { type FastifyInstance } from "fastify";
 import cookie from "@fastify/cookie";
-import cors from "@fastify/cors";
+import cors, { type OriginFunction } from "@fastify/cors";
 import compress from "@fastify/compress";
 import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
@@ -18,7 +18,7 @@ import { sessionHook } from "./lib/auth.js";
 import { authRoutes } from "./routes/auth.js";
 import { adminRoutes } from "./routes/admin.js";
 import { assetRoutes } from "./routes/assets.js";
-import { workspaceRoutes } from "./routes/workspaces.js";
+import { capabilitySetRoutes } from "./routes/capability-sets.js";
 import { projectRoutes } from "./routes/projects.js";
 import { deviceRoutes } from "./routes/devices.js";
 import { installRoutes } from "./routes/install.js";
@@ -104,11 +104,12 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
     ban: 0,
   });
   await app.register(cors, {
-    origin: (origin, callback) => callback(null, origin && isTrustedBrowserOrigin(origin) ? origin : false),
+    origin: ((origin, callback) =>
+      callback(null, origin && isTrustedBrowserOrigin(origin) ? origin : false)) satisfies OriginFunction,
     credentials: true,
   });
   await app.register(cookie);
-  // gzip JSON / text responses above ~1KB. Keeps Markdown/JSON workspace
+  // gzip JSON / text responses above ~1KB. Keeps Markdown/JSON capability set
   // payloads small over the wire without per-route configuration.
   await app.register(compress, { global: true, threshold: 1024 });
   await app.register(websocket);
@@ -118,7 +119,7 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   authRoutes(app);
   adminRoutes(app);
   assetRoutes(app);
-  workspaceRoutes(app);
+  capabilitySetRoutes(app);
   projectRoutes(app);
   deviceRoutes(app);
   installRoutes(app);

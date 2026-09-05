@@ -1,8 +1,8 @@
 /**
- * 项目同步的服务端原语：把"工作空间期望状态 → 物理 plan"提炼成可复用函数。
+ * 项目同步的服务端原语：把"能力集期望状态 → 物理 plan"提炼成可复用函数。
  *
  * 谁在调：
- *  - /api/install/plan       /api/install/execute     —— 手动安装 / 切换工作空间
+ *  - /api/install/plan       /api/install/execute     —— 手动安装 / 切换能力集
  *  - lib/auto-sync.ts        compensateDeviceOnConnect —— agent 重连补偿
  *  - lib/auto-sync.ts        syncProjectNow            —— locked→auto 立即同步
  *
@@ -26,7 +26,7 @@ import { applyPathBindings, loadAuthBindings, loadDistributedCredentials } from 
 
 export interface PlanInput {
   projectId: string;
-  workspaceId: string;
+  capabilitySetId: string;
   targetTools: string[];
   policy: "auto" | "locked";
 }
@@ -51,23 +51,23 @@ export function buildInstallPlan(userId: string, input: PlanInput): PlanOk | Pla
     return { error: "项目不存在", status: 404 };
   }
 
-  const workspace = db.prepare("SELECT * FROM workspaces WHERE id = ?").get(input.workspaceId) as any;
-  if (!workspace || workspace.deleted_at) {
-    return { error: "工作空间不存在", status: 404 };
+  const capabilitySet = db.prepare("SELECT * FROM capability_sets WHERE id = ?").get(input.capabilitySetId) as any;
+  if (!capabilitySet || capabilitySet.deleted_at) {
+    return { error: "能力集不存在", status: 404 };
   }
 
-  const wa = db.prepare("SELECT asset_id FROM workspace_assets WHERE workspace_id = ?").all(workspace.id) as any[];
+  const wa = db.prepare("SELECT asset_id FROM capability_set_assets WHERE capability_set_id = ?").all(capabilitySet.id) as any[];
   const assetIds = wa.map((a) => a.asset_id);
-  // 含留存（已软删但仍被本空间引用）成员：从库删除某 asset 不应使引用它的工作空间
+  // 含留存（已软删但仍被本能力集引用）成员：从库删除某 asset 不应使引用它的能力集
   // 在安装时静默丢项；留存 asset 内容仍在，照常落盘并重新建立安装引用。
   const assetRows = assetIds.length > 0
     ? db.prepare(`SELECT * FROM assets WHERE id IN (${assetIds.map(() => "?").join(",")})`).all(...assetIds) as any[]
     : [];
 
-  // 可见性过滤：跨用户协作时（共享 workspace）成员可能是别人创建的 private asset，
+  // 可见性过滤：跨用户协作时，共享能力集成员可能是别人创建的 private asset，
   // 项目所有者本无权拿到其内容。统一按 author===email 放行 private（与
   // asset-manifest.loadAssetEntries 同一口径），public 任意可见。
-  // 此前 buildPlan 不过滤，等同于把任何 workspace 拉进来的 private asset 全文
+  // 此前 buildPlan 不过滤，等同于把任何能力集拉进来的 private asset 全文
   // 发到项目机器——既是泄露隐患，也与 auto-sync 路径行为不一致。
   const email = ownerEmail(project.user_id);
   const visibleAssets = assetRows.filter(
@@ -75,10 +75,10 @@ export function buildInstallPlan(userId: string, input: PlanInput): PlanOk | Pla
   );
 
   const manifest: Manifest = {
-    workspaceId: workspace.id,
-    workspaceName: workspace.name,
-    version: workspace.version,
-    targetTools: JSON.parse(workspace.target_tools || "[]"),
+    capabilitySetId: capabilitySet.id,
+    capabilitySetName: capabilitySet.name,
+    version: capabilitySet.version,
+    targetTools: JSON.parse(capabilitySet.target_tools || "[]"),
     assets: visibleAssets.map((a: any): ManifestAssetEntry => {
       const files = db.prepare(
         "SELECT path, content, encoding FROM asset_files WHERE asset_id = ? ORDER BY path"
@@ -103,7 +103,7 @@ export function buildInstallPlan(userId: string, input: PlanInput): PlanOk | Pla
   const effectiveTools = input.targetTools.filter((t) => manifest.targetTools.includes(t as any)) as Manifest["targetTools"];
 
   if (effectiveTools.length === 0) {
-    return { error: "工作空间不支持所选的任何目标工具", status: 400 };
+    return { error: "能力集不支持所选的任何目标工具", status: 400 };
   }
 
   const adapters = getAdapters(effectiveTools);
@@ -188,8 +188,8 @@ export function buildInstallPlan(userId: string, input: PlanInput): PlanOk | Pla
   }
 
   const conflicts: string[] = [];
-  // 同名不同 id 撞车检测（ADR-0006）：待装空间的 asset 与项目现有「其他来源」的受管
-  // 能力（其它订阅的 workspace_assets − 跳过集 ∪ project_capabilities）同名同类型时，
+  // 同名不同 id 撞车检测（ADR-0006）：待装能力集的 asset 与项目现有「其他来源」的受管
+  // 能力（其它订阅的 capability_set_assets − 跳过集 ∪ project_capabilities）同名同类型时，
   // 落盘路径必然撞车。同 id = 跨订阅共享单例，不算冲突。用户在安装流程中逐条裁决
   // （跳过 / 全部跳过 / 取消），execute 携带 skipAssetIds 生效。
   const conflictingAssets: InstallConflict[] = [];
@@ -197,16 +197,16 @@ export function buildInstallPlan(userId: string, input: PlanInput): PlanOk | Pla
     const incoming = new Map(visibleAssets.map((a: any) => [a.id as string, a]));
     const otherIds = new Set<string>();
     const subRows = db.prepare(
-      "SELECT workspace_id FROM project_subscriptions WHERE project_id = ? AND workspace_id != '' AND workspace_id != ?",
-    ).all(input.projectId, workspace.id) as { workspace_id: string }[];
+      "SELECT capability_set_id FROM project_subscriptions WHERE project_id = ? AND capability_set_id != '' AND capability_set_id != ?",
+    ).all(input.projectId, capabilitySet.id) as { capability_set_id: string }[];
     for (const s of subRows) {
       const excluded = new Set(
         (db.prepare(
-          "SELECT asset_id FROM project_subscription_excludes WHERE project_id = ? AND workspace_id = ?",
-        ).all(input.projectId, s.workspace_id) as { asset_id: string }[]).map((r) => r.asset_id),
+          "SELECT asset_id FROM project_subscription_excludes WHERE project_id = ? AND capability_set_id = ?",
+        ).all(input.projectId, s.capability_set_id) as { asset_id: string }[]).map((r) => r.asset_id),
       );
-      const wa = db.prepare("SELECT asset_id FROM workspace_assets WHERE workspace_id = ?")
-        .all(s.workspace_id) as { asset_id: string }[];
+      const wa = db.prepare("SELECT asset_id FROM capability_set_assets WHERE capability_set_id = ?")
+        .all(s.capability_set_id) as { asset_id: string }[];
       for (const r of wa) if (!excluded.has(r.asset_id)) otherIds.add(r.asset_id);
     }
     const caps = db.prepare("SELECT asset_id FROM project_capabilities WHERE project_id = ?")
@@ -237,8 +237,8 @@ export function buildInstallPlan(userId: string, input: PlanInput): PlanOk | Pla
   }
 
   const plan: InstallPlan = {
-    workspaceId: workspace.id,
-    workspaceName: workspace.name,
+    capabilitySetId: capabilitySet.id,
+    capabilitySetName: capabilitySet.name,
     projectId: project.id,
     projectName: project.project_name,
     targetTools: effectiveTools,

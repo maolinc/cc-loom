@@ -1,5 +1,5 @@
 /**
- * `loom push` —— 把本地厂商目录的内容推送到平台，创建或覆盖一个工作空间。
+ * `loom push` —— 把本地厂商目录的内容推送到平台，创建或覆盖一个能力集。
  *
  * 流程：
  * 1. 检查登录配置
@@ -7,7 +7,7 @@
  * 3. 多个时交互选择（或 --tool 指定）
  * 4. 获取用户邮箱，提取用户名
  * 5. 解析厂商目录为 ImportedAsset[]
- * 6. 确定工作空间名（默认 用户名/项目目录名，或 --name）
+ * 6. 确定能力集名（默认 用户名/项目目录名，或 --name）
  * 7. POST /api/push
  * 8. 打印结果
  */
@@ -76,7 +76,7 @@ export async function pushCommand(opts: PushOptions): Promise<void> {
   const username = me.email.split("@")[0] || "user";
   const projectDir = basename(cwd);
 
-  // 4. 确定工作空间名
+  // 4. 确定能力集名
   const name = opts.name || `${username}/${projectDir}`;
 
   // 5. 解析厂商目录
@@ -110,12 +110,12 @@ export async function pushCommand(opts: PushOptions): Promise<void> {
   });
 
   // 7. 打印结果
-  ok(`${result.created ? "已创建" : "已覆盖"}工作空间：${color.bold(result.workspaceName)}`);
-  kv("ID", result.workspaceId);
+  ok(`${result.created ? "已创建" : "已覆盖"}能力集：${color.bold(result.capabilitySetName)}`);
+  kv("ID", result.capabilitySetId);
   kv("Assets", String(result.assetCount));
   kv("Tool", TARGET_TOOL_LABELS[tool]);
   kv("Visibility", visibility);
   nextSteps([
-    ["Web 工作空间列表", "查看并安装到项目"],
+    ["Web 能力集列表", "查看并安装到项目"],
   ]);
 }

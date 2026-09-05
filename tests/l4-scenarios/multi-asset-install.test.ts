@@ -2,12 +2,12 @@
  * L4 编排: 多项目多工具安装编排
  *
  * 角色:
- * - 用户 A: 创建含 4 类 asset 的 workspace (cursor + claudecode)
+ * - 用户 A: 创建含 4 类 asset 的 capabilitySet (cursor + claudecode)
  * - 项目 1: 安装到 cursor
  * - 项目 2: 安装到 claudecode
  *
  * 流程:
- * 1. A 创建 4 个 asset (skill, rule, mcp, command) + workspace
+ * 1. A 创建 4 个 asset (skill, rule, mcp, command) + capabilitySet
  * 2. 项目 1 安装到 cursor → 断言 cursor 目录
  * 3. 项目 2 安装到 claudecode → 断言 claude 目录 + 根 .mcp.json
  *
@@ -51,7 +51,7 @@ describe("L4 multi-asset-install: 多项目多工具编排", () => {
     if (proj2) cleanupProject(proj2);
   });
 
-  it("同一 workspace 分别装到两个项目的 cursor 和 claudecode", async () => {
+  it("同一 capabilitySet 分别装到两个项目的 cursor 和 claudecode", async () => {
     server = await startServer();
     api = new ApiClient(server.baseUrl);
     await api.login("multi@example.com");
@@ -63,7 +63,7 @@ describe("L4 multi-asset-install: 多项目多工具编排", () => {
     const mcp = await api.createAsset(assetBuilders.mcp("multi-mcp", "npx serve", ["cursor", "claudecode"]));
     const cmd = await api.createAsset(assetBuilders.command("multi-cmd", "/build", ["cursor", "claudecode"]));
 
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "ws-multi", description: "multi asset", targetTools: ["cursor", "claudecode"], visibility: "public" },
       [skill.id, rule.id, mcp.id, cmd.id],
     );
@@ -82,7 +82,7 @@ describe("L4 multi-asset-install: 多项目多工具编排", () => {
 
     await api.installExecute({
       projectId: agent1.projectId,
-      workspaceId: ws.id,
+      capabilitySetId: ws.id,
       targetTools: ["cursor"],
       policy: "locked",
     });
@@ -107,7 +107,7 @@ describe("L4 multi-asset-install: 多项目多工具编排", () => {
 
     await api.installExecute({
       projectId: agent2.projectId,
-      workspaceId: ws.id,
+      capabilitySetId: ws.id,
       targetTools: ["claudecode"],
       policy: "locked",
     });

@@ -1,5 +1,5 @@
 /**
- * 下载打包：把能力 / 工作空间渲染成 zip 条目，再由路由层用 fflate 压成 zip。
+ * 下载打包：把能力 / 能力集渲染成 zip 条目，再由路由层用 fflate 压成 zip。
  *
  * 两种渲染模式：
  *  - 预览结构（无厂商）：与 DetailPanel 的 `activeFileFullPath` 一致——
@@ -8,7 +8,7 @@
  *  - 厂商结构：走 adapter.generate，产出 `<targetDir>/...` 完整安装包；
  *    不兼容该厂商的类型由 adapter 跳过（决策点 A，UI 侧提示）。
  *
- * 不写入任何描述性文件（如 loom-workspace.json），避免「多余东西」。
+ * 不写入任何描述性文件，避免「多余东西」。
  */
 import { zipSync } from "fflate";
 import { ASSET_TYPE_DIRS, isAssetDirLayout } from "@maolinc/cc-loom-shared";
@@ -34,7 +34,7 @@ function fileData(content: string, encoding?: string | null): Buffer {
  *   path    = wrap ? <typeDir>/<name>/<file.path> : <typeDir>/<file.path>
  *
  * `options.typeDir`（默认 true）控制是否带顶层能力类型目录：
- *  - 工作空间下载传 true（多能力按类型隔离）。
+ *  - 能力集下载传 true（多能力按类型隔离）。
  *  - 单能力下载传 false——zip 就是「能力本身」：目录型 `<name>/<file.path>`，
  *    平铺型直接 `<file.path>`，不加 `skills/` / `rules/` 等类型前缀。
  */
@@ -59,18 +59,18 @@ export function buildAssetPreviewEntries(
   });
 }
 
-/** 工作空间预览结构：每个成员资产按 buildAssetPreviewEntries 铺放（带类型目录），全部包含。 */
-export function buildWorkspacePreviewEntries(assets: ManifestAssetEntry[]): ZipEntry[] {
+/** 能力集预览结构：每个成员资产按 buildAssetPreviewEntries 铺放（带类型目录），全部包含。 */
+export function buildCapabilitySetPreviewEntries(assets: ManifestAssetEntry[]): ZipEntry[] {
   const out: ZipEntry[] = [];
   for (const a of assets) out.push(...buildAssetPreviewEntries(a));
   return out;
 }
 
 /**
- * 工作空间厂商结构：走 adapter.generate，合并各厂商输出（各自带 targetDir 前缀，
+ * 能力集厂商结构：走 adapter.generate，合并各厂商输出（各自带 targetDir 前缀，
  * 天然隔离）。返回条目与被跳过的资产（不兼容类型），供 UI 提示。
  */
-export function buildWorkspaceVendorEntries(
+export function buildCapabilitySetVendorEntries(
   manifest: Manifest,
   tools: TargetTool[],
 ): { entries: ZipEntry[]; skipped: { assetName: string; type: AssetType; tool: TargetTool }[] } {
@@ -90,7 +90,7 @@ export function buildWorkspaceVendorEntries(
 
 /**
  * 把条目压成 zip Buffer。同名路径后者覆盖前者（聚合 mcp 多厂商时会合并到各自 targetDir，不冲突）。
- * `prefix` 非空时，每个条目路径前加 `<prefix>/`——工作空间下载用它把所有文件包到 `<工作空间名>/` 顶层目录下。
+ * `prefix` 非空时，每个条目路径前加 `<prefix>/`——能力集下载用它把所有文件包到 `<能力集名>/` 顶层目录下。
  */
 export function zipEntries(entries: ZipEntry[], prefix?: string): Buffer {
   const files: Record<string, Uint8Array> = {};

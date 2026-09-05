@@ -65,8 +65,8 @@ function distributePathToProject(credRow: any, projectId: string): void {
     VALUES (?, 'path', ?, ?)
     ON CONFLICT(credential_id, axis, target_id) DO UPDATE SET pushed_at = excluded.pushed_at
   `).run(credRow.id, projectId, now);
-  const project = db.prepare("SELECT device_id, sync_policy, status FROM projects WHERE id = ?").get(projectId) as
-    | { device_id: string; sync_policy: string; status: string }
+  const project = db.prepare("SELECT device_id, status FROM projects WHERE id = ?").get(projectId) as
+    | { device_id: string; status: string }
     | undefined;
   if (project && project.status !== "unregistered") {
     // path 分发是用户的显式动作 → force，即使项目 locked 也照常注入（与 install/capabilities 同口径）。

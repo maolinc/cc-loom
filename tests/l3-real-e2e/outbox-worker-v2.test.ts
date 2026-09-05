@@ -2,11 +2,11 @@
  * L3 outbox-worker-v2（wire 协议 v2）— 真实 server + FakeAgent（mock 外部 agent）。
  *
  * 用 startAgent 注册真实项目，再切到 FakeAgent 以观察 server → agent 的 reconcile
- * RPC。触发走真实 API（install / workspace edit），断言走 FakeAgent 捕获的 RPC +
+ * RPC。触发走真实 API（install / capabilitySet edit），断言走 FakeAgent 捕获的 RPC +
  * outbox HTTP 路由（可观测出口），不直调 enqueueReconcile/wakeDeviceV2、不直查 DB。
  *
  * 不变量:
- *  - auto 项目 workspace 编辑 → 推 reconcile，plan.enabled 含正确成员
+ *  - auto 项目 capabilitySet 编辑 → 推 reconcile，plan.enabled 含正确成员
  *  - 折叠：连续多次编辑 → 仅 1 次 RPC
  *  - locked 项目 auto-sync → 不发 RPC（outbox 标记完成/skip）
  *  - 离线期间入队 → 重连后消费
@@ -65,18 +65,18 @@ describe("L3 outbox-worker-v2 (wire 协议 v2)", () => {
     }
   }
 
-  it("auto 项目 workspace 加成员 → FakeAgent 收到 reconcile，plan.enabled 含新成员", async () => {
+  it("auto 项目 capabilitySet 加成员 → FakeAgent 收到 reconcile，plan.enabled 含新成员", async () => {
     await bootAndRegister("v2-1@example.com");
     const a1 = await api.createAsset(assetBuilders.skill("a1", ["cursor"]));
     const a2 = await api.createAsset(assetBuilders.skill("a2", ["cursor"]));
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "ws", description: "x", targetTools: ["cursor"], visibility: "private" }, [a1.id],
     );
-    await api.installExecute({ projectId: agent!.projectId, workspaceId: ws.id, targetTools: ["cursor"], policy: "auto" });
+    await api.installExecute({ projectId: agent!.projectId, capabilitySetId: ws.id, targetTools: ["cursor"], policy: "auto" });
 
     await swapToFake();
     // 加 a2 → auto 同步入队 reconcile
-    await api.updateWorkspace(ws.id, { assetIds: [a1.id, a2.id] });
+    await api.updateCapabilitySet(ws.id, { assetIds: [a1.id, a2.id] });
 
     const req = await fake!.waitForReq((r) => r.op === "reconcile" && r.payload.plan.enabled.some((e: any) => e.assetId === a2.id), 5000);
     const enabledIds = req.payload.plan.enabled.map((e: any) => e.assetId);
@@ -85,20 +85,20 @@ describe("L3 outbox-worker-v2 (wire 协议 v2)", () => {
     expect(req.payload.targetTools).toEqual(["cursor"]);
   });
 
-  it("折叠：连续 3 次 workspace 编辑 → FakeAgent 仅收 1 次 reconcile RPC", async () => {
+  it("折叠：连续 3 次 capabilitySet 编辑 → FakeAgent 仅收 1 次 reconcile RPC", async () => {
     await bootAndRegister("v2-2@example.com");
     const a1 = await api.createAsset(assetBuilders.skill("f1", ["cursor"]));
     const a2 = await api.createAsset(assetBuilders.skill("f2", ["cursor"]));
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "ws", description: "x", targetTools: ["cursor"], visibility: "private" }, [a1.id],
     );
-    await api.installExecute({ projectId: agent!.projectId, workspaceId: ws.id, targetTools: ["cursor"], policy: "auto" });
+    await api.installExecute({ projectId: agent!.projectId, capabilitySetId: ws.id, targetTools: ["cursor"], policy: "auto" });
     await swapToFake();
 
     // 连续 3 次编辑，最终态为 [a1, a2]
-    await api.updateWorkspace(ws.id, { assetIds: [a1.id, a2.id] });
-    await api.updateWorkspace(ws.id, { assetIds: [a1.id] });
-    await api.updateWorkspace(ws.id, { assetIds: [a1.id, a2.id] });
+    await api.updateCapabilitySet(ws.id, { assetIds: [a1.id, a2.id] });
+    await api.updateCapabilitySet(ws.id, { assetIds: [a1.id] });
+    await api.updateCapabilitySet(ws.id, { assetIds: [a1.id, a2.id] });
 
     // 等最终态 reconcile：plan.enabled 含 a1+a2（无论中间折叠了几次，最终态一致）
     const req = await fake!.waitForReq(
@@ -114,24 +114,24 @@ describe("L3 outbox-worker-v2 (wire 协议 v2)", () => {
     await bootAndRegister("v2-3@example.com");
     const a1 = await api.createAsset(assetBuilders.skill("lk1", ["cursor"]));
     const a2 = await api.createAsset(assetBuilders.skill("lk2", ["cursor"]));
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "ws", description: "x", targetTools: ["cursor"], visibility: "private" }, [a1.id],
     );
-    await api.installExecute({ projectId: agent!.projectId, workspaceId: ws.id, targetTools: ["cursor"], policy: "locked" });
+    await api.installExecute({ projectId: agent!.projectId, capabilitySetId: ws.id, targetTools: ["cursor"], policy: "locked" });
     await swapToFake();
 
-    await api.updateWorkspace(ws.id, { assetIds: [a1.id, a2.id] });
+    await api.updateCapabilitySet(ws.id, { assetIds: [a1.id, a2.id] });
     await fake!.expectNoReq(800);
   });
 
-  it("离线期间 workspace 编辑 → 重连后 FakeAgent 收到 reconcile", async () => {
+  it("离线期间 capabilitySet 编辑 → 重连后 FakeAgent 收到 reconcile", async () => {
     await bootAndRegister("v2-4@example.com");
     const a1 = await api.createAsset(assetBuilders.skill("off1", ["cursor"]));
     const a2 = await api.createAsset(assetBuilders.skill("off2", ["cursor"]));
-    const ws = await api.createWorkspace(
+    const ws = await api.createCapabilitySet(
       { name: "ws", description: "x", targetTools: ["cursor"], visibility: "private" }, [a1.id],
     );
-    await api.installExecute({ projectId: agent!.projectId, workspaceId: ws.id, targetTools: ["cursor"], policy: "auto" });
+    await api.installExecute({ projectId: agent!.projectId, capabilitySetId: ws.id, targetTools: ["cursor"], policy: "auto" });
 
     // 停真 agent（离线）
     await stopAgent(agent!);
@@ -142,7 +142,7 @@ describe("L3 outbox-worker-v2 (wire 协议 v2)", () => {
     }
 
     // 离线期间编辑
-    await api.updateWorkspace(ws.id, { assetIds: [a1.id, a2.id] });
+    await api.updateCapabilitySet(ws.id, { assetIds: [a1.id, a2.id] });
 
     // 重连（FakeAgent）
     fake = await FakeAgent.connect(server.baseUrl, token, deviceId);

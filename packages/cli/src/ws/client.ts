@@ -157,7 +157,7 @@ export class AgentClient extends EventEmitter {
       this.send(MSG_AUTH, {
         token: this.opts.config.token,
         deviceId: this.opts.config.deviceId,
-        // 自报支持 reconcile v2 wire 协议 + 多空间订阅（ADR-0006）；
+        // 自报支持 reconcile v2 wire 协议 + 多能力集订阅（ADR-0006）；
         // server 当前实现要求这两个字段均为 true 才放行。
         capabilities: { reconcileV2: true, subscriptionsV3: true, toolConfigProfiles: true },
       });

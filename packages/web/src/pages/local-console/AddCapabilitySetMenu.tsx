@@ -1,8 +1,8 @@
 /**
- * AddWorkspaceMenu —— 「+ 添加空间」下拉菜单（ADR-0006 多空间订阅）。
+ * AddCapabilitySetMenu —— 「+ 添加能力集」下拉菜单（ADR-0006 多能力集订阅）。
  *
- * 语义 = 为项目新增一条空间订阅（能力叠加生效），不再是「切换工作空间」：
- *  - 候选列表过滤掉已订阅的空间（重复选择 = 重装，走订阅卡的重装路径）。
+ * 语义 = 为项目新增一条能力集订阅（能力叠加生效），不再是「切换能力集」：
+ *  - 候选列表过滤掉已订阅的能力集（重复选择 = 重装，走订阅卡的重装路径）。
  *  - 选中候选 → 触发 plan API 预览 diff；撞车（conflictingAssets）弹
  *    InstallConflictDialog 逐条裁决，execute 携带 skipAssetIds。
  *  - 同步策略可选 auto / locked（挂在订阅上）。
@@ -10,7 +10,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../api.js";
-import type { InstallPlan, InstallConflict, Workspace, SyncPolicy, TargetTool } from "@maolinc/cc-loom-shared";
+import type { InstallPlan, InstallConflict, CapabilitySet, SyncPolicy, TargetTool } from "@maolinc/cc-loom-shared";
 import { sortTargetTools, TARGET_TOOL_LABELS } from "@maolinc/cc-loom-shared";
 import { Loader2 } from "lucide-react";
 import SearchInput from "../../components/SearchInput.js";
@@ -21,8 +21,8 @@ import { executeInstall } from "../../lib/installFlow.js";
 
 interface Props {
   projectId: string;
-  /** 项目已订阅的 workspaceId 集合，用于过滤候选列表。 */
-  subscribedWorkspaceIds: string[];
+  /** 项目已订阅的 capabilitySetId 集合，用于过滤候选列表。 */
+  subscribedCapabilitySetIds: string[];
   /** 默认目标工具集合，作为安装厂商的预选。 */
   defaultTargets: TargetTool[];
   /** 安装成功后回调，父组件应据此刷新项目镜像。 */
@@ -30,14 +30,14 @@ interface Props {
   onClose: () => void;
 }
 
-export default function AddWorkspaceMenu({
+export default function AddCapabilitySetMenu({
   projectId,
-  subscribedWorkspaceIds,
+  subscribedCapabilitySetIds,
   defaultTargets,
   onInstalled,
   onClose,
 }: Props) {
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [capabilitySets, setCapabilitySets] = useState<CapabilitySet[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [plan, setPlan] = useState<InstallPlan | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,68 +45,68 @@ export default function AddWorkspaceMenu({
   const [planning, setPlanning] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // 安装策略挂在订阅上：auto = 空间更新自动同步；locked = 锁定当前版本。
+  // 安装策略挂在订阅上：auto = 能力集更新自动同步；locked = 锁定当前版本。
   const [policy, setPolicy] = useState<SyncPolicy>("auto");
-  // 用户在安装时选择要落盘的厂商；选中工作空间后预选与项目 defaultTargets 的交集。
+  // 用户在安装时选择要落盘的厂商；选中能力集后预选与项目 defaultTargets 的交集。
   const [selectedTools, setSelectedTools] = useState<TargetTool[]>([]);
   // plan 报出撞车时弹裁决弹窗（null = 未弹）。
   const [conflicts, setConflicts] = useState<InstallConflict[] | null>(null);
 
-  const selectedWorkspace = useMemo(
-    () => workspaces.find((w) => w.id === selected) ?? null,
-    [workspaces, selected],
+  const selectedCapabilitySet = useMemo(
+    () => capabilitySets.find((w) => w.id === selected) ?? null,
+    [capabilitySets, selected],
   );
 
-  // 选中工作空间时：预选 defaultTargets ∩ 工作空间声明厂商（保留用户既有选择），
+  // 选中能力集时：预选 defaultTargets ∩ 能力集声明厂商（保留用户既有选择），
   // 为空再回退全选。
   useEffect(() => {
-    if (!selectedWorkspace) {
+    if (!selectedCapabilitySet) {
       setSelectedTools([]);
       return;
     }
-    const wsTools = sortTargetTools(selectedWorkspace.targetTools);
-    const preset = defaultTargets.filter((t) => selectedWorkspace.targetTools.includes(t));
-    setSelectedTools(preset.length > 0 ? sortTargetTools(preset) : wsTools);
-  }, [selectedWorkspace, defaultTargets]);
+    const capabilitySetTools = sortTargetTools(selectedCapabilitySet.targetTools);
+    const preset = defaultTargets.filter((t) => selectedCapabilitySet.targetTools.includes(t));
+    setSelectedTools(preset.length > 0 ? sortTargetTools(preset) : capabilitySetTools);
+  }, [selectedCapabilitySet, defaultTargets]);
 
-  // 实际安装目标 = 用户勾选集合（已约束在工作空间声明的厂商内）。
+  // 实际安装目标 = 用户勾选集合（已约束在能力集声明的厂商内）。
   const installTargets = useMemo<TargetTool[]>(
-    () => (selectedWorkspace ? selectedTools.filter((t) => selectedWorkspace.targetTools.includes(t)) : []),
-    [selectedTools, selectedWorkspace],
+    () => (selectedCapabilitySet ? selectedTools.filter((t) => selectedCapabilitySet.targetTools.includes(t)) : []),
+    [selectedTools, selectedCapabilitySet],
   );
 
   const toggleTool = (t: TargetTool) =>
     setSelectedTools((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : sortTargetTools([...cur, t])));
 
-  // 搜索走服务端（/workspaces?query=），避免只在已加载的一页里过滤导致漏项。
+  // 搜索走服务端（/capability-sets?query=），避免只在已加载的一页里过滤导致漏项。
   useEffect(() => {
     let alive = true;
     setLoading(true);
     const params = new URLSearchParams();
     if (searchQuery) params.set("query", searchQuery);
     params.set("pageSize", "50");
-    api.get<Workspace[]>(`/workspaces?${params}`).then((res) => {
+    api.get<CapabilitySet[]>(`/capability-sets?${params}`).then((res) => {
       if (!alive) return;
       if (res.success && res.data) {
-        setWorkspaces(res.data.filter((w) => !subscribedWorkspaceIds.includes(w.id)));
+        setCapabilitySets(res.data.filter((w) => !subscribedCapabilitySetIds.includes(w.id)));
       }
       setLoading(false);
     });
     return () => { alive = false; };
-  }, [subscribedWorkspaceIds, searchQuery]);
+  }, [subscribedCapabilitySetIds, searchQuery]);
 
   useEffect(() => {
     if (!selected) { setPlan(null); return; }
     if (installTargets.length === 0) {
       setPlan(null);
-      setError("该工作空间没有目标工具，无法安装");
+      setError("该能力集没有目标工具，无法安装");
       return;
     }
     setPlanning(true);
     setError(null);
     api.post<{ plan?: InstallPlan } | InstallPlan>("/install/plan", {
       projectId,
-      workspaceId: selected,
+      capabilitySetId: selected,
       targetTools: installTargets,
       policy,
     }).then((res) => {
@@ -127,11 +127,11 @@ export default function AddWorkspaceMenu({
     setError(null);
     try {
       if (installTargets.length === 0) {
-        setError("该工作空间没有目标工具，无法安装");
+        setError("该能力集没有目标工具，无法安装");
         return;
       }
       const res = await executeInstall({
-        projectId, workspaceId: selected, targetTools: installTargets, policy, skipAssetIds,
+        projectId, capabilitySetId: selected, targetTools: installTargets, policy, skipAssetIds,
       });
       if ("error" in res) {
         setError(res.error);
@@ -156,7 +156,7 @@ export default function AddWorkspaceMenu({
   return (
     <div className="absolute right-0 top-full mt-2 w-[420px] bg-white rounded-xl border border-surface-sunken shadow-xl z-30 max-h-[70vh] flex flex-col">
       <div className="px-4 py-3 border-b border-surface-sunken flex items-center justify-between">
-        <span className="text-sm font-semibold text-text-primary">添加空间</span>
+        <span className="text-sm font-semibold text-text-primary">添加能力集</span>
         <button onClick={onClose} className="text-xs text-text-muted hover:text-text-primary">关闭</button>
       </div>
       <div className="px-4 pt-3 pb-2 border-b border-surface-sunken">
@@ -164,11 +164,11 @@ export default function AddWorkspaceMenu({
           query={searchQuery}
           onQueryChange={setSearchQuery}
           showTypes={false}
-          placeholder="搜索工作空间名称或描述..."
+          placeholder="搜索能力集名称或描述..."
         />
         {!loading && (
           <div className="mt-2 text-[11px] text-text-muted tabular-nums">
-            {searchQuery ? `匹配 ${workspaces.length} 个工作空间` : `共 ${workspaces.length} 个可添加的工作空间`}
+            {searchQuery ? `匹配 ${capabilitySets.length} 个能力集` : `共 ${capabilitySets.length} 个可添加的能力集`}
           </div>
         )}
       </div>
@@ -177,13 +177,13 @@ export default function AddWorkspaceMenu({
           <div className="px-4 py-8 text-sm text-text-muted flex items-center justify-center gap-2">
             <Loader2 size={14} className="animate-spin" /> 加载中…
           </div>
-        ) : workspaces.length === 0 ? (
+        ) : capabilitySets.length === 0 ? (
           <div className="px-4 py-8 text-sm text-text-muted text-center">
-            {searchQuery ? `未找到包含“${searchQuery}”的工作空间` : "暂无可添加的工作空间"}
+            {searchQuery ? `未找到包含“${searchQuery}”的能力集` : "暂无可添加的能力集"}
           </div>
         ) : (
           <div className="space-y-1 p-2">
-            {workspaces.map((w) => (
+            {capabilitySets.map((w) => (
               <button
                 key={w.id}
                 onClick={() => setSelected(w.id === selected ? null : w.id)}
@@ -208,15 +208,15 @@ export default function AddWorkspaceMenu({
       </div>
       {selected && (
         <div className="border-t border-surface-sunken px-4 py-3 space-y-2.5">
-          {/* 厂商选择：用户挑选本次要落盘的厂商（约束在工作空间声明的范围内） */}
-          {selectedWorkspace && (
+          {/* 厂商选择：用户挑选本次要落盘的厂商（约束在能力集声明的范围内） */}
+          {selectedCapabilitySet && (
             <div>
               <div className="text-[11px] font-medium text-text-secondary mb-1.5">
                 安装到厂商
                 <span className="text-text-muted font-normal">（可多选，订阅后还能调整）</span>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {sortTargetTools(selectedWorkspace.targetTools).map((t) => {
+                {sortTargetTools(selectedCapabilitySet.targetTools).map((t) => {
                   const on = selectedTools.includes(t);
                   return (
                     <button
@@ -243,11 +243,11 @@ export default function AddWorkspaceMenu({
           <div className="flex items-center gap-3 text-[11px]">
             <span className="font-medium text-text-secondary">同步策略</span>
             <label className="flex items-center gap-1.5 cursor-pointer text-text-secondary">
-              <input type="radio" name="add-ws-policy" checked={policy === "auto"} onChange={() => setPolicy("auto")} className="accent-brand" />
+              <input type="radio" name="add-capability-set-policy" checked={policy === "auto"} onChange={() => setPolicy("auto")} className="accent-brand" />
               自动同步
             </label>
             <label className="flex items-center gap-1.5 cursor-pointer text-text-secondary">
-              <input type="radio" name="add-ws-policy" checked={policy === "locked"} onChange={() => setPolicy("locked")} className="accent-brand" />
+              <input type="radio" name="add-capability-set-policy" checked={policy === "locked"} onChange={() => setPolicy("locked")} className="accent-brand" />
               锁定
             </label>
           </div>
@@ -274,14 +274,14 @@ export default function AddWorkspaceMenu({
             disabled={!plan || planning || installTargets.length === 0}
             onClick={handleInstall}
           >
-            {installTargets.length === 0 ? "请至少选择一个厂商" : "添加该空间"}
+            {installTargets.length === 0 ? "请至少选择一个厂商" : "添加该能力集"}
           </Button>
         </div>
       )}
       {conflicts && (
         <InstallConflictDialog
           conflicts={conflicts}
-          workspaceName={selectedWorkspace?.name}
+          capabilitySetName={selectedCapabilitySet?.name}
           busy={installing}
           onCancel={() => setConflicts(null)}
           onConfirm={async (skipAssetIds) => {

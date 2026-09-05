@@ -19,7 +19,7 @@ interface SourceRow {
   lastSyncAt: string | null;
   lastError: string | null;
   assetCount: number;
-  workspaceCount: number;
+  capabilitySetCount: number;
 }
 
 function StatusDot({ status }: { status: string | null }) {
@@ -137,7 +137,7 @@ export default function MarketplaceTab() {
               </div>
               <div className="text-xs text-text-secondary">
                 由 <span className="text-text-primary font-medium">{formatAuthorName(s.addedBy)}</span> 导入
-                {" · "}{s.assetCount} 个能力{s.workspaceCount > 0 ? ` · ${s.workspaceCount} 个工作空间` : ""}
+                {" · "}{s.assetCount} 个能力{s.capabilitySetCount > 0 ? ` · ${s.capabilitySetCount} 个能力集` : ""}
                 {s.lastSyncAt && ` · 上次同步 ${new Date(s.lastSyncAt).toLocaleString("zh-CN")}`}
               </div>
               {s.lastSyncStatus === "failed" && s.lastError && (

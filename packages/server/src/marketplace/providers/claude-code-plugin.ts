@@ -144,7 +144,7 @@ async function parseMarketplace(
 
       // Extract assets from the local plugin directory in-place. We pass the
       // marketplace plugin entry's metadata (name/version/description/author)
-      // so the resulting Workspace is named after the plugin even if the
+      // so the resulting CapabilitySet is named after the plugin even if the
       // sub-dir lacks its own plugin.json. `isMarketplaceRoot` flags entries
       // whose source resolves to the marketplace root (self-pointing repos),
       // which changes the `skills` add→replace semantics per the spec.

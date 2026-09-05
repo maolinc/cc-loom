@@ -19,12 +19,12 @@
 
 Loom 是面向 AI 开发工具生态的能力注册、组合、安装与本地镜像平台。
 
-用户在 Web 中管理可复用的 AI 工程能力单元（Asset），把多个 Asset 组合为 Workspace，再安装到本机已注册项目中。实际文件写入由本地 Agent 完成，目标为项目内 AI 工具目录和配置文件。
+用户在 Web 中管理可复用的 AI 工程能力单元（Asset），把多个 Asset 组合为 CapabilitySet，再安装到本机已注册项目中。实际文件写入由本地 Agent 完成，目标为项目内 AI 工具目录和配置文件。
 
 ### 1.3 核心价值
 
 - 统一管理 Skill、Rule、MCP、Hook、Command、Agent 六类能力。
-- 通过 Workspace 组合多项能力，一次性安装到项目。
+- 通过 CapabilitySet 组合多项能力，一次性安装到项目。
 - 通过 Adapter 将统一能力模型转换到 Cursor、CodeBuddy、Codex、Claude Code 等工具目录。
 - 通过本地 Agent 建立 Web 到本地项目目录的安全写入链路。
 - 通过本地控制台展示真实磁盘镜像、Loom 管理文件和外部文件差异。
@@ -40,11 +40,11 @@ Loom 是面向 AI 开发工具生态的能力注册、组合、安装与本地�
 | `Device` | 运行 `loom start` 的本地设备 | `server/src/routes/devices.ts`、`server/src/ws/gateway.ts` |
 | `Project` | 通过 `loom register` 注册的本地项目目录 | `server/src/routes/projects.ts`、`cli/src/lib/projects.ts` |
 | `Asset` | 最小能力单元，包含多文件内容和 metadata | `shared/src/types.ts`、`server/src/routes/assets.ts` |
-| `Workspace` | Asset 组合，可安装到 Project | `shared/src/types.ts`、`server/src/routes/workspaces.ts` |
-| `WorkspaceSubscription` | 项目与 Workspace 的安装关系（多空间订阅，ADR-0006），携带 syncPolicy/targetTools | `shared/src/types.ts`、`server/src/lib/subscriptions.ts` |
+| `CapabilitySet` | Asset 组合，可安装到 Project | `shared/src/types.ts`、`server/src/routes/capability-sets.ts` |
+| `CapabilitySetSubscription` | 项目与 CapabilitySet 的安装关系（多能力集订阅，ADR-0006），携带 syncPolicy/targetTools | `shared/src/types.ts`、`server/src/lib/subscriptions.ts` |
 | `Manifest` | Server 构建安装计划时的统一中间结构 | `shared/src/types.ts`、`server/src/routes/install.ts` |
 | `LockFile` | CLI 本地安装账本，记录 managed 文件、能力开关和聚合贡献 | `shared/src/types.ts`、`cli/src/lib/installer.ts` |
-| `MarketplaceSource` | 外部 Git 来源，导入 Asset / Workspace | `server/src/marketplace/*` |
+| `MarketplaceSource` | 外部 Git 来源，导入 Asset / CapabilitySet | `server/src/marketplace/*` |
 
 ### 2.2 支持的 Asset 类型
 
@@ -166,13 +166,13 @@ Loom 是面向 AI 开发工具生态的能力注册、组合、安装与本地�
 - 创建/编辑表单可调用 `POST /api/ai/asset-basic-info`，根据已填写内容、metadata 和文件上下文生成名称、别名、标签、描述并回填页面；只有用户继续点击创建/保存后才写入 Asset。
 - 来源于 Marketplace 的 Asset 可由导入人编辑；删除仍受保护。
 - Asset 可填写来源地址 `sourceUrl`；导入 Asset 默认使用源仓库地址作为来源地址。
-- 已被工作空间或本地项目引用的 Asset 不能修改 `name`，避免落盘路径或聚合 key 改变后在本地出现重复能力；这类展示文案调整应修改 `alias`。
+- 已被能力集或本地项目引用的 Asset 不能修改 `name`，避免落盘路径或聚合 key 改变后在本地出现重复能力；这类展示文案调整应修改 `alias`。
 - 更新文件、metadata、兼容工具或名称后，会触发 auto 项目的 best-effort 内容同步。
 
 ### 4.3 删除与留存
 
 - 删除逻辑由 `server/src/lib/asset-gc.ts` 控制。
-- 已被 Workspace 或已安装项目引用的 Asset 可能进入 retained 状态，避免本地安装内容和工作空间成员引用断裂。
+- 已被 CapabilitySet 或已安装项目引用的 Asset 可能进入 retained 状态，避免本地安装内容和能力集成员引用断裂。
 - Server 通过 `project_installed_assets` 维护安装引用计数，该表由 Agent 上报的本地状态对账。
 
 ### 4.4 文件录入
@@ -185,14 +185,14 @@ Loom 是面向 AI 开发工具生态的能力注册、组合、安装与本地�
 - MCP JSON 模板生成。
 - 按类型播种默认模板文件。
 
-## 5. Workspace 功能
+## 5. CapabilitySet 功能
 
 ### 5.1 列表、搜索与详情
 
-- 列表：`GET /api/workspaces`
-- 详情：`GET /api/workspaces/:id`
-- Manifest：`GET /api/workspaces/:id/manifest`
-- 下载 zip：`GET /api/workspaces/:id/download`，zip 顶层目录为工作空间名，所有文件包在 `<工作空间名>/` 下。
+- 列表：`GET /api/capability-sets`
+- 详情：`GET /api/capability-sets/:id`
+- Manifest：`GET /api/capability-sets/:id/manifest`
+- 下载 zip：`GET /api/capability-sets/:id/download`，zip 顶层目录为能力集名，所有文件包在 `<能力集名>/` 下。
   - 无 `tool` 参数（默认）：按预览结构下载，包含全部成员能力，asset_files 原样不聚合、不重组。
   - `?tool=cursor,claudecode`（可多选）：按所选厂商的安装结构下载（`<targetDir>/...`），不兼容该厂商的能力类型被排除，响应头 `X-Loom-Skipped` 标注被排除能力供前端提示；未知 tool 值静默忽略。
   - 不写任何描述文件，保证完整体不多不少。可见性与详情接口一致。
@@ -201,33 +201,33 @@ Loom 是面向 AI 开发工具生态的能力注册、组合、安装与本地�
 
 ### 5.2 创建、编辑、删除
 
-- 创建：`POST /api/workspaces`
-- 编辑：`PUT /api/workspaces/:id`
-- 删除：`DELETE /api/workspaces/:id`
+- 创建：`POST /api/capability-sets`
+- 编辑：`PUT /api/capability-sets/:id`
+- 删除：`DELETE /api/capability-sets/:id`
 - 字段：名称、描述、目标工具、可见性、成员 Asset。
-- 同一用户不能创建相同名字的工作空间（DB 唯一索引 `idx_workspaces_user_name`，软删行不参与约束）。创建和改名时冲突返回 409。
+- 同一用户不能创建相同名字的能力集（DB 唯一索引 `idx_capability_sets_user_name`，软删行不参与约束）。创建和改名时冲突返回 409。
 - 创建/更新时会检测落盘身份冲突：同一目标工具下如果多个 Asset 会抢占同一身份载体，则返回 409。
 - 更新成员后，Server 会对 auto + 在线项目 best-effort 同步成员变化。
-- Marketplace 来源 Workspace 可由导入人编辑；删除仍受保护。
+- Marketplace 来源 CapabilitySet 可由导入人编辑；删除仍受保护。
 
 ### 5.3 隐式订阅（单独添加的能力）
 
-单个 Asset 安装不走独立安装协议，也不创建工作空间。`POST /api/projects/:id/capabilities/add`
+单个 Asset 安装不走独立安装协议，也不创建能力集。`POST /api/projects/:id/capabilities/add`
 把 asset 加入 `project_capabilities`（per-project、不扇出），作为项目的**隐式订阅**
-（`project_subscriptions.workspace_id = ''`）参与统一 reconcile。隐式订阅在控制台呈现为
+（`project_subscriptions.capability_set_id = ''`）参与统一 reconcile。隐式订阅在控制台呈现为
 「单独添加的能力」分组，syncPolicy 可独立切换，targetTools 跟随项目有效厂商集合。
 
 ## 6. 安装与本地落盘
 
-### 6.1 安装计划（多空间订阅，ADR-0006）
+### 6.1 安装计划（多能力集订阅，ADR-0006）
 
 - 生成计划：`POST /api/install/plan`
 - 执行安装：`POST /api/install/execute`
-- 请求字段：`projectId`、`workspaceId`、`targetTools`、`policy`、`skipAssetIds?`。
-- `policy` 支持：`auto`、`locked`，挂在订阅上（每个空间独立）。
-- 语义 = **添加/重装一条订阅**（不再是替换）：一个项目可同时安装多个 Workspace，能力叠加生效。
+- 请求字段：`projectId`、`capabilitySetId`、`targetTools`、`policy`、`skipAssetIds?`。
+- `policy` 支持：`auto`、`locked`，挂在订阅上（每个能力集独立）。
+- 语义 = **添加/重装一条订阅**（不再是替换）：一个项目可同时安装多个 CapabilitySet，能力叠加生效。
 - 同一 asset id 跨订阅共享单例，按 (能力 × 厂商) 引用计数；卸载订阅
-  （`DELETE /api/projects/:id/subscriptions/:wid`）时仅最后引用者撤文件。
+  （`DELETE /api/projects/:id/subscriptions/:capabilitySetId`）时仅最后引用者撤文件。
 - 同名不同 id 的能力落盘路径必然撞车：plan 返回结构化 `conflictingAssets`，
   execute 须携带 `skipAssetIds` 完成逐条裁决（跳过 = 仅本次不装，可后续重装补齐），
   未裁决的撞车返回 409。
@@ -281,7 +281,7 @@ Lock 文件位置：`~/.loom/locks/<projectId>.json`。
 
 - legacy：`assets.__plan__.files` 保存全部 managed 文件。
 - per-asset（v2）：`assets[assetId].vendors[tool]` 保存每个能力在每个工具下的 enabled 状态和文件归属；`aggregates[tool]` 保存 MCP/Hook 聚合文件及贡献者。
-- 多订阅（v3，`lockFormat: "3"`，ADR-0006）：`subscriptions[]` 记录生效的空间订阅快照（取代 v2 的单值 `workspaceId`/`policy`），assets/aggregates 结构不变。
+- 多订阅（v3，`lockFormat: "3"`，ADR-0006）：`subscriptions[]` 记录生效的能力集订阅快照（取代 v2 的单值 `capabilitySetId`/`policy`），assets/aggregates 结构不变。
 
 本地控制台单项能力开关、添加、移除依赖 per-asset lock。
 
@@ -298,7 +298,7 @@ Lock 文件位置：`~/.loom/locks/<projectId>.json`。
 | `loom status` | 查看连接、设备、项目状态，离线可用 |
 | `loom register` | 注册当前项目目录 |
 | `loom unregister` | 注销当前项目目录 |
-| `loom push` | 推送本地厂商目录到平台，创建或覆盖工作空间 |
+| `loom push` | 推送本地厂商目录到平台，创建或覆盖能力集 |
 
 ### 7.2 本地数据位置
 
@@ -329,22 +329,22 @@ Lock 文件位置：`~/.loom/locks/<projectId>.json`。
 
 本地控制台页面路径：`/console`。
 
-当前能力（多空间订阅，ADR-0006）：
+当前能力（多能力集订阅，ADR-0006）：
 
-- 展示已注册项目列表、设备、状态、路径、空间订阅摘要。
+- 展示已注册项目列表、设备、状态、路径、能力集订阅摘要。
 - 30 秒轮询项目列表；非活跃 KeepAlive tab 暂停轮询。
 - 通过 WebSocket 监听 `web:project:state_changed`，刷新选中项目状态。
-- **订阅条**：每条空间订阅一张卡（名称、留存徽标、auto/locked 切换、目标厂商管理、卸载/编辑/导出），末尾「+ 添加空间」；隐式订阅呈现为「单独添加的能力」简卡。
+- **订阅条**：每条能力集订阅一张卡（名称、留存徽标、auto/locked 切换、目标厂商管理、卸载/编辑/导出），末尾「+ 添加能力集」；隐式订阅呈现为「单独添加的能力」简卡。
 - 展示项目本地镜像：按厂商目录视图和按能力矩阵视图（磁盘真值 = 所有订阅的并集）。
-- 能力矩阵保持平铺（一行一能力），渲染来源空间徽标（共享能力显示多个），支持按来源空间过滤。
-- 共享能力（多订阅引用）的 toggle/remove 是项目级操作，UI 给「同时被空间 X 引用」轻提示。
+- 能力矩阵保持平铺（一行一能力），渲染来源能力集徽标（共享能力显示多个），支持按来源能力集过滤。
+- 共享能力（多订阅引用）的 toggle/remove 是项目级操作，UI 给「同时被能力集 X 引用」轻提示。
 - 区分 Loom managed 文件、external 文件、missing 文件。
 - 支持刷新本地扫描。
 - 支持读取文件内容预览。
-- 支持按订阅卸载工作空间（共享能力按引用计数保留）。
+- 支持按订阅卸载能力集（共享能力按引用计数保留）。
 - 支持给项目添加单项能力。
 - 支持单项能力 toggle 和 remove。
-- 添加空间时同名不同 id 撞车逐条裁决（跳过该能力 / 全部跳过 / 取消）。
+- 添加能力集时同名不同 id 撞车逐条裁决（跳过该能力 / 全部跳过 / 取消）。
 - 展示每个 skill 在本项目的累计调用次数（通过 hook 旁路统计，0 不显示）；移除该能力后计数清零，重装从 0 起。
 - lock 中 expected 文件全部消失时，Agent 自动清 lock，Server 同步清空全部显式订阅。
 
@@ -352,18 +352,18 @@ Lock 文件位置：`~/.loom/locks/<projectId>.json`。
 
 ### 9.1 同步策略
 
-策略挂在**订阅**上（ADR-0006）：安装每个空间时独立选择，之后可单独切换；
+策略挂在**订阅**上（ADR-0006）：安装每个能力集时独立选择，之后可单独切换；
 隐式订阅（单独添加的能力）有自己的策略。
 
 | 策略 | 当前行为 |
 |------|----------|
-| `auto` | Server 在该 Workspace 成员变化或其 Asset 内容变化后，对订阅了它的项目 best-effort 推送更新 |
+| `auto` | Server 在该 CapabilitySet 成员变化或其 Asset 内容变化后，对订阅了它的项目 best-effort 推送更新 |
 | `locked` | 该订阅跳过自动同步，除非用户手动重装或切回 auto（其它订阅不受影响） |
 
 ### 9.2 自动同步触发
 
 - Asset 内容、metadata、兼容工具、名称变化：同步经 auto 订阅（或 auto 隐式订阅的单独添加）安装了该 Asset 的项目。
-- Workspace 成员变化：同步以 auto 订阅该 Workspace 的项目。
+- CapabilitySet 成员变化：同步以 auto 订阅该 CapabilitySet 的项目。
 - 订阅从 locked 切回 auto：立即重推最新状态。
 - Agent 重连：对有任一 auto 订阅（显式，或有能力的隐式）的项目重推；当前保守不补偿离线期间的成员移除。
 
@@ -404,9 +404,9 @@ Server ingest 后：
 ### 10.2 同步行为
 
 - Server clone/fetch Git 仓库到本地 source 目录。
-- Provider 解析 Asset 和 plugin Workspace。
+- Provider 解析 Asset 和 plugin CapabilitySet。
 - 按 `sourcePath` upsert `assets` / `asset_files`。
-- plugin 映射为 public Workspace。
+- plugin 映射为 public CapabilitySet。
 - 写入同步日志，记录 added / updated / removed / duration / error。
 - 调度器按 `marketplace.poll_interval_minutes` 定期同步。
 
@@ -432,16 +432,16 @@ Server ingest 后：
 
 ### 10.4 本地推送（loom push）
 
-通过 CLI `loom push` 把本地厂商目录（`.cursor/` / `.codebuddy/` / `.codex/` / `.claude/`）的内容推送到平台，创建或覆盖一个工作空间。
+通过 CLI `loom push` 把本地厂商目录（`.cursor/` / `.codebuddy/` / `.codex/` / `.claude/`）的内容推送到平台，创建或覆盖一个能力集。
 
 - 端点：`POST /api/push`（CLI Bearer token 认证）
 - CLI 选项：`--tool`（指定厂商）、`--name`（自定义名称）、`--visibility`（默认 private）
 - 默认命名：`用户名/项目目录名`，用户名取自邮箱 `@` 前缀。
 - 多厂商目录存在时交互选择。
 - CLI 解析厂商目录为 `ImportedAsset[]`（扫描 `skills/` / `rules/` / `commands/` / `agents/` / `hooks/` / `mcp.json`），发送给 Server。
-- Server 按 `(author, type, name)` upsert asset，按 `(user_id, name)` upsert workspace。
-- 同名 workspace 已存在且非 marketplace 来源 → 覆盖成员（全量替换 `workspace_assets`，失联 asset GC）。
-- 同名 workspace 来自 marketplace → 返回 409，提示换名。
+- Server 按 `(author, type, name)` upsert asset，按 `(user_id, name)` upsert 能力集。
+- 同名 能力集 已存在且非 marketplace 来源 → 覆盖成员（全量替换 `capability_set_assets`，失联 asset GC）。
+- 同名 能力集 来自 marketplace → 返回 409，提示换名。
 - ClaudeCode 的 MCP 文件在项目根 `.mcp.json`，其他厂商在 vendor 目录内 `mcp.json`。
 
 ## 11. Web 页面清单
@@ -450,28 +450,28 @@ Server ingest 后：
 |------|------|----------|----------|
 | `/login` | 登录页 | 否 | 邮箱密码登录 |
 | `/` | 能力市场 | 否；未登录只看 public | 搜索、类型筛选、卡片、详情、安装入口 |
-| `/workspaces` | 工作空间列表 | 否；未登录只看 public | 搜索、可见性筛选、详情、安装入口 |
+| `/capability-sets` | 能力集列表 | 否；未登录只看 public | 搜索、可见性筛选、详情、安装入口 |
 | `/assets/new` | 新建能力 | 是 | 六类 Asset 表单、模板、上传、metadata、鉴权方式、AI 生成基础信息 |
 | `/assets/:id/edit` | 编辑能力 | 是 | 编辑自己创建且非来源导入的 Asset，可 AI 生成基础信息 |
-| `/workspaces/new` | 新建工作空间 | 是 | 左侧能力浏览 + 右侧组合画布 |
-| `/workspaces/:id/edit` | 编辑工作空间 | 是 | 编辑自己创建或自己导入的 Workspace |
+| `/capability-sets/new` | 新建能力集 | 是 | 左侧能力浏览 + 右侧组合画布 |
+| `/capability-sets/:id/edit` | 编辑能力集 | 是 | 编辑自己创建或自己导入的 CapabilitySet |
 | `/console` | 本地控制台 | 是 | 项目、镜像、安装态、能力管理 |
 | `/docs` | 文档页 | 否 | 快速开始、CLI 命令、同步关系、能力类型、厂商官方链接、兼容矩阵、安装路径 |
 | `/settings` | 设置页 | 是 | 账号、密码、CLI Token、AI 生成配置、能力信息生成（admin）、数据来源、能力鉴权配置、Codex/Claude Code 工具配置档与设备下发、语义搜索（admin）、用户管理（admin） |
 
-主导航 tab 使用 `KeepAlive` 保持挂载：`/`、`/workspaces`、`/console`、`/docs`、`/settings`。
+主导航 tab 使用 `KeepAlive` 保持挂载：`/`、`/capability-sets`、`/console`、`/docs`、`/settings`。
 
 ## 12. 当前明确不做 / 暂未实现
 
 以下不是当前代码能力：
 
-- 企业组织、团队空间、复杂 RBAC、SSO。
+- 企业组织、团队能力集、复杂 RBAC、SSO。
 - 资产签名、安全扫描、审核流、沙箱执行 Hook。
 - 用户自定义 Adapter、Adapter 插件化。
 - 对任意本地目录的 Web 输入接管。
 - 自动扫描所有项目目录。
 - 复杂语义化版本范围、多发布渠道、版本历史表。
-- 收藏、评分、评论、关注、推荐榜单、Fork Workspace。
+- 收藏、评分、评论、关注、推荐榜单、Fork CapabilitySet。
 - 三方 diff UI 和复杂冲突自动合并。
 - `.agent` 目标目录。
 
@@ -483,13 +483,13 @@ Server ingest 后：
 2. CLI 可以 login/logout/start/stop/status/register/unregister。
 3. Web 可以创建、编辑、删除、搜索六类 Asset。
 4. Skill 创建必须包含根 `SKILL.md`。
-5. Web 可以创建、编辑、删除、搜索 Workspace，并组合多个 Asset。
-6. Workspace 成员落盘身份冲突会被拦截。
-7. Server 可以为 Workspace 生成安装计划（添加订阅），同名撞车给出可裁决清单。
+5. Web 可以创建、编辑、删除、搜索 CapabilitySet，并组合多个 Asset。
+6. CapabilitySet 成员落盘身份冲突会被拦截。
+7. Server 可以为 CapabilitySet 生成安装计划（添加订阅），同名撞车给出可裁决清单。
 8. Agent 在线时，Web 可以执行安装并收到结果。
 9. CLI Agent 会写入目标工具目录并更新 `~/.loom/locks/<projectId>.json`。
-10. 本地控制台可以展示项目镜像、读取文件、刷新扫描、按订阅安装/卸载多个 Workspace、管理单项能力。
-11. auto 策略会对在线项目 best-effort 同步 Workspace/Asset 变化。
+10. 本地控制台可以展示项目镜像、读取文件、刷新扫描、按订阅安装/卸载多个 CapabilitySet、管理单项能力。
+11. auto 策略会对在线项目 best-effort 同步 CapabilitySet/Asset 变化。
 12. Marketplace 可以添加 Git 来源、刷新、查看日志、设置轮询间隔。
 13. 设置页可以配置 AI 服务；能力创建/编辑页可以生成并回填名称、别名、标签、描述，保存前不生效。
 14. 设置页可以保存多套 Codex / Claude Code 工具配置档并选择在线设备下发；Agent 对用户级配置文件执行字段级合并，不删除未管理字段。

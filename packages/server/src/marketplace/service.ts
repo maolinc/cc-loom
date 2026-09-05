@@ -93,14 +93,14 @@ export const marketplaceService = {
     return sourceQueries.list().map((s) => ({
       ...s,
       assetCount: sourceQueries.countAssets(s.id),
-      workspaceCount: sourceQueries.countWorkspaces(s.id),
+      capabilitySetCount: sourceQueries.countCapabilitySets(s.id),
     }));
   },
 
   get(id: string): MarketplaceSourceWithCounts | null {
     const s = sourceQueries.findById(id);
     if (!s) return null;
-    return { ...s, assetCount: sourceQueries.countAssets(id), workspaceCount: sourceQueries.countWorkspaces(id) };
+    return { ...s, assetCount: sourceQueries.countAssets(id), capabilitySetCount: sourceQueries.countCapabilitySets(id) };
   },
 
   async refresh(id: string): Promise<{ status: "success" | "failed"; error: string | null }> {

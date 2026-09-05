@@ -5,7 +5,7 @@
  *  - 单能力预览结构 = DetailPanel activeFileFullPath：dir 型 `<typeDir>/<name>/<file.path>`，
  *    平铺型 `<typeDir>/<file.path>`，mcp 无 typeDir 直接 `<file.path>`。
  *  - skill / hook 恒为目录型（即使单文件也包 name）。
- *  - 工作空间预览结构包含全部成员资产，不聚合、不重组。
+ *  - 能力集预览结构包含全部成员资产，不聚合、不重组。
  *  - 厂商结构走 adapter.generate：不兼容类型进 skipped，兼容的产出 `<targetDir>/...`。
  *  - zipEntries 产出可被 fflate unzipSync 还原，文件路径与内容一致。
  */
@@ -14,8 +14,8 @@ import { unzipSync } from "fflate";
 import type { Manifest, ManifestAssetEntry, AssetType, TargetTool } from "@maolinc/cc-loom-shared";
 import {
   buildAssetPreviewEntries,
-  buildWorkspacePreviewEntries,
-  buildWorkspaceVendorEntries,
+  buildCapabilitySetPreviewEntries,
+  buildCapabilitySetVendorEntries,
   zipEntries,
   downloadFilename,
 } from "../lib/download-archive.js";
@@ -33,7 +33,7 @@ function asset(
 }
 
 function manifestOf(assets: ManifestAssetEntry[], tools: TargetTool[] = ["claudecode"]): Manifest {
-  return { workspaceId: "ws", workspaceName: "ws", version: "1", targetTools: tools, assets };
+  return { capabilitySetId: "ws", capabilitySetName: "ws", version: "1", targetTools: tools, assets };
 }
 
 function paths(entries: { path: string }[]): string[] {
@@ -174,9 +174,9 @@ describe("buildAssetPreviewEntries — 单能力下载 (typeDir: false)", () => 
   });
 });
 
-describe("buildWorkspacePreviewEntries — 工作空间无厂商结构", () => {
+describe("buildCapabilitySetPreviewEntries — 能力集无厂商结构", () => {
   it("包含全部成员资产，按各自类型铺放，不聚合 mcp", () => {
-    const entries = buildWorkspacePreviewEntries([
+    const entries = buildCapabilitySetPreviewEntries([
       asset({ name: "s1", type: "skill", files: [{ path: "SKILL.md", content: "# s1" }] }),
       asset({ name: "m1", type: "mcp", files: [{ path: "config.json", content: "{}" }] }),
       asset({ name: "r1", type: "rule", sourcePath: "rules/r1.md", files: [{ path: "r1.md", content: "# r1" }] }),
@@ -189,7 +189,7 @@ describe("buildWorkspacePreviewEntries — 工作空间无厂商结构", () => {
   });
 });
 
-describe("buildWorkspaceVendorEntries — 工作空间厂商结构", () => {
+describe("buildCapabilitySetVendorEntries — 能力集厂商结构", () => {
   it("走 adapter.generate：claudecode 完整安装路径，agent 兼容", () => {
     const m = manifestOf([
       asset({
@@ -200,7 +200,7 @@ describe("buildWorkspaceVendorEntries — 工作空间厂商结构", () => {
         files: [{ path: "reviewer.md", content: "# x" }],
       }),
     ], ["claudecode"]);
-    const { entries, skipped } = buildWorkspaceVendorEntries(m, ["claudecode"]);
+    const { entries, skipped } = buildCapabilitySetVendorEntries(m, ["claudecode"]);
     expect(paths(entries)).toEqual([".claude/agents/reviewer.md"]);
     expect(skipped).toEqual([]);
   });
@@ -215,7 +215,7 @@ describe("buildWorkspaceVendorEntries — 工作空间厂商结构", () => {
         files: [{ path: "reviewer.md", content: "# x" }],
       }),
     ], ["cursor"]);
-    const { entries, skipped } = buildWorkspaceVendorEntries(m, ["cursor"]);
+    const { entries, skipped } = buildCapabilitySetVendorEntries(m, ["cursor"]);
     expect(paths(entries)).toEqual([".cursor/agents/reviewer.md"]);
     expect(skipped).toEqual([]);
   });
@@ -231,7 +231,7 @@ describe("buildWorkspaceVendorEntries — 工作空间厂商结构", () => {
         files: [{ path: "reviewer.md", content: "# reviewer\n\nReview code." }],
       }),
     ], ["codex"]);
-    const { entries, skipped } = buildWorkspaceVendorEntries(m, ["codex"]);
+    const { entries, skipped } = buildCapabilitySetVendorEntries(m, ["codex"]);
     expect(paths(entries)).toEqual([".codex/agents/reviewer.toml"]);
     expect(skipped).toEqual([]);
     const toml = entries[0]!.data.toString("utf8");
@@ -250,7 +250,7 @@ describe("buildWorkspaceVendorEntries — 工作空间厂商结构", () => {
         files: [{ path: "SKILL.md", content: "# s1" }],
       }),
     ], ["cursor", "claudecode"]);
-    const { entries } = buildWorkspaceVendorEntries(m, ["cursor", "claudecode"]);
+    const { entries } = buildCapabilitySetVendorEntries(m, ["cursor", "claudecode"]);
     expect(paths(entries)).toEqual([".claude/skills/s1/SKILL.md", ".cursor/skills/s1/SKILL.md"]);
   });
 });
@@ -270,16 +270,16 @@ describe("zipEntries — 产出可还原", () => {
     expect(Buffer.from(restored["skills/s1/SKILL.md"]!).toString("utf8")).toBe("# s1\n");
   });
 
-  it("prefix 非空时，所有路径前加 <prefix>/（工作空间名顶层目录）", () => {
+  it("prefix 非空时，所有路径前加 <prefix>/（能力集名顶层目录）", () => {
     const entries = [
       { path: "skills/s1/SKILL.md", data: Buffer.from("# s1\n") },
       { path: ".cursor/mcp.json", data: Buffer.from("{}") },
     ];
-    const zip = zipEntries(entries, "我的空间");
+    const zip = zipEntries(entries, "我的能力集");
     const restored = unzipSync(new Uint8Array(zip));
     expect(Object.keys(restored).sort()).toEqual([
-      "我的空间/.cursor/mcp.json",
-      "我的空间/skills/s1/SKILL.md",
+      "我的能力集/.cursor/mcp.json",
+      "我的能力集/skills/s1/SKILL.md",
     ]);
   });
 });

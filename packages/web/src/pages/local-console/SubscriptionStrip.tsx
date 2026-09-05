@@ -1,36 +1,36 @@
 /**
- * SubscriptionStrip —— 订阅条（ADR-0006 多空间订阅）。
+ * SubscriptionStrip —— 订阅条（ADR-0006 多能力集订阅）。
  *
- * 取代旧的「当前工作空间卡」：每张显式订阅一张卡（名称、retained 徽标、
- * auto/locked 切换、目标厂商管理行、⋯ 菜单：编辑工作空间 / 导出 / 卸载该订阅）；
+ * 取代旧的「当前能力集卡」：每张显式订阅一张卡（名称、retained 徽标、
+ * auto/locked 切换、目标厂商管理行、⋯ 菜单：编辑能力集 / 导出 / 卸载该订阅）；
  * 若项目有「单独添加的能力」则渲染一张隐式订阅简卡（sync-policy 切换 + 项目级
- * targets 行，无卸载）；末尾「+ 添加空间」卡打开 AddWorkspaceMenu。
+ * targets 行，无卸载）；末尾「+ 添加能力集」卡打开 AddCapabilitySetMenu。
  *
  * 同步策略与目标厂商都挂在订阅上：
- *  - sync-policy：POST /projects/:id/subscriptions/:wid/sync-policy（隐式用 "implicit"）
- *  - targets：显式走 /projects/:id/subscriptions/:wid/targets；隐式走项目级 /targets
+ *  - sync-policy：POST /projects/:id/subscriptions/:capabilitySetId/sync-policy（隐式用 "implicit"）
+ *  - targets：显式走 /projects/:id/subscriptions/:capabilitySetId/targets；隐式走项目级 /targets
  */
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronDown, Download, Eye, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { TARGET_TOOLS } from "@maolinc/cc-loom-shared";
-import type { Project, SyncPolicy, TargetTool, WorkspaceSubscription } from "@maolinc/cc-loom-shared";
+import type { Project, SyncPolicy, TargetTool, CapabilitySetSubscription } from "@maolinc/cc-loom-shared";
 import { api } from "../../api.js";
 import { useToast } from "../../components/Toast.js";
 import ConfirmDialog from "../../components/ConfirmDialog.js";
 import ManageTargetsRow from "./ManageTargetsRow.js";
-import AddWorkspaceMenu from "./AddWorkspaceMenu.js";
+import AddCapabilitySetMenu from "./AddCapabilitySetMenu.js";
 
-/** 订阅对应工作空间的补充信息（详情接口拉取；retained 空间拉不到时缺省）。 */
-export interface SubscriptionWorkspaceMeta {
+/** 订阅对应能力集的补充信息（详情接口拉取；retained 能力集拉不到时缺省）。 */
+export interface SubscriptionCapabilitySetMeta {
   description?: string;
   targetTools?: TargetTool[];
 }
 
 interface Props {
   project: Project;
-  /** workspaceId → 工作空间详情（描述 / 声明厂商），由父组件按订阅集合拉取。 */
-  workspaceMeta: Map<string, SubscriptionWorkspaceMeta>;
+  /** capabilitySetId → 能力集详情（描述 / 声明厂商），由父组件按订阅集合拉取。 */
+  capabilitySetMeta: Map<string, SubscriptionCapabilitySetMeta>;
   /** 项目是否有「单独添加的能力」（决定是否渲染隐式订阅简卡）。 */
   hasStandaloneCapabilities: boolean;
   /** legacy lock：禁用订阅级管理操作。 */
@@ -39,37 +39,37 @@ interface Props {
   onChanged: () => Promise<void> | void;
   /** 导出本地镜像清单（JSON）。 */
   onExport: () => void;
-  /** 打开工作空间详情面板（复用市场/列表的同款 DetailPanel）。 */
-  onOpenWorkspace?: (workspaceId: string) => void;
+  /** 打开能力集详情面板（复用市场/列表的同款 DetailPanel）。 */
+  onOpenCapabilitySet?: (capabilitySetId: string) => void;
 }
 
 export default function SubscriptionStrip({
   project,
-  workspaceMeta,
+  capabilitySetMeta,
   hasStandaloneCapabilities,
   legacyLock,
   onChanged,
   onExport,
-  onOpenWorkspace,
+  onOpenCapabilitySet,
 }: Props) {
   const toast = useToast();
   const navigate = useNavigate();
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [moreMenuFor, setMoreMenuFor] = useState<string | null>(null);
-  const [uninstallSub, setUninstallSub] = useState<WorkspaceSubscription | null>(null);
+  const [uninstallSub, setUninstallSub] = useState<CapabilitySetSubscription | null>(null);
   const [uninstalling, setUninstalling] = useState(false);
 
-  const explicitSubs = project.subscriptions.filter((s) => s.workspaceId !== null);
-  const implicitSub = project.subscriptions.find((s) => s.workspaceId === null) ?? null;
+  const explicitSubs = project.subscriptions.filter((s) => s.capabilitySetId !== null);
+  const implicitSub = project.subscriptions.find((s) => s.capabilitySetId === null) ?? null;
 
-  // 空间过多时默认折叠，避免把下方本地镜像区挤到很远；用户可手动展开管理。
+  // 能力集过多时默认折叠，避免把下方本地镜像区挤到很远；用户可手动展开管理。
   const [collapsed, setCollapsed] = useState(() => explicitSubs.length > 3);
 
-  const handleSetSyncPolicy = async (sub: WorkspaceSubscription, policy: SyncPolicy) => {
+  const handleSetSyncPolicy = async (sub: CapabilitySetSubscription, policy: SyncPolicy) => {
     if (sub.syncPolicy === policy) return;
-    const wid = sub.workspaceId ?? "implicit";
+    const capabilitySetId = sub.capabilitySetId ?? "implicit";
     const res = await api.post<{ policy: string }>(
-      `/projects/${project.id}/subscriptions/${wid}/sync-policy`,
+      `/projects/${project.id}/subscriptions/${capabilitySetId}/sync-policy`,
       { policy },
     );
     if (!res.success) {
@@ -80,16 +80,16 @@ export default function SubscriptionStrip({
     toast.success(
       policy === "auto" ? "已开启自动同步" : "已锁定版本",
       policy === "auto"
-        ? "该空间的后续更新将自动同步到本项目"
-        : "该空间的更新不再自动同步，需手动重装",
+        ? "该能力集的后续更新将自动同步到本项目"
+        : "该能力集的更新不再自动同步，需手动重装",
     );
   };
 
   const handleUninstallConfirm = async () => {
-    if (!uninstallSub?.workspaceId || uninstalling) return;
+    if (!uninstallSub?.capabilitySetId || uninstalling) return;
     setUninstalling(true);
-    const name = uninstallSub.workspaceName ?? uninstallSub.workspaceId;
-    const res = await api.delete(`/projects/${project.id}/subscriptions/${uninstallSub.workspaceId}`);
+    const name = uninstallSub.capabilitySetName ?? uninstallSub.capabilitySetId;
+    const res = await api.delete(`/projects/${project.id}/subscriptions/${uninstallSub.capabilitySetId}`);
     setUninstalling(false);
     setUninstallSub(null);
     if (!res.success) {
@@ -106,15 +106,15 @@ export default function SubscriptionStrip({
         <button
           type="button"
           onClick={() => setCollapsed((v) => !v)}
-          aria-label={collapsed ? "展开空间订阅" : "折叠空间订阅"}
+          aria-label={collapsed ? "展开能力集订阅" : "折叠能力集订阅"}
           aria-expanded={!collapsed}
           className="w-6 h-6 grid place-items-center rounded-md text-text-muted hover:bg-surface-sunken hover:text-text-primary transition-colors"
         >
           <ChevronDown size={16} className={`transition-transform ${collapsed ? "-rotate-90" : ""}`} />
         </button>
-        <h2 className="text-base font-semibold tracking-tight text-text-primary">空间订阅</h2>
+        <h2 className="text-base font-semibold tracking-tight text-text-primary">能力集订阅</h2>
         <span className="text-[11px] text-text-muted">
-          {explicitSubs.length > 0 ? `${explicitSubs.length} 个空间，能力叠加生效` : "尚未订阅空间"}
+          {explicitSubs.length > 0 ? `${explicitSubs.length} 个能力集，能力叠加生效` : "尚未订阅能力集"}
         </span>
         <div className="flex-1" />
         <button
@@ -123,30 +123,30 @@ export default function SubscriptionStrip({
           className="inline-flex items-center gap-1.5 px-2.5 h-7 text-xs font-medium text-text-secondary border border-gray-200 rounded-lg bg-white hover:bg-surface-card hover:text-text-primary transition-colors"
         >
           <Plus size={13} />
-          添加空间
+          添加能力集
         </button>
       </div>
 
       {!collapsed && (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
         {explicitSubs.map((sub) => {
-          const wid = sub.workspaceId!;
-          const meta = workspaceMeta.get(wid);
+          const capabilitySetId = sub.capabilitySetId!;
+          const meta = capabilitySetMeta.get(capabilitySetId);
           return (
             <div
-              key={wid}
+              key={capabilitySetId}
               className="relative bg-white rounded-2xl border border-surface-sunken shadow-card p-4 transition-shadow hover:shadow-lift"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <h3 className="text-sm font-semibold text-text-primary truncate">
-                      {sub.workspaceName ?? wid}
+                      {sub.capabilitySetName ?? capabilitySetId}
                     </h3>
                     {sub.retained && (
                       <span
                         className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-100"
-                        title="该工作空间已从工作空间库移除，仅因本项目仍在使用而留存"
+                        title="该能力集已从能力集库移除，仅因本项目仍在使用而留存"
                       >
                         已下架 · 留存
                       </span>
@@ -161,9 +161,9 @@ export default function SubscriptionStrip({
                   />
                   <ManageTargetsRow
                     projectId={project.id}
-                    workspaceTargets={meta?.targetTools ?? sub.targetTools ?? []}
+                    capabilitySetTargets={meta?.targetTools ?? sub.targetTools ?? []}
                     activeTargets={sub.targetTools ?? []}
-                    endpoint={`/projects/${project.id}/subscriptions/${wid}/targets`}
+                    endpoint={`/projects/${project.id}/subscriptions/${capabilitySetId}/targets`}
                     disabled={legacyLock}
                     onChanged={onChanged}
                   />
@@ -171,29 +171,29 @@ export default function SubscriptionStrip({
                 <div className="relative shrink-0">
                   <button
                     type="button"
-                    onClick={() => setMoreMenuFor((cur) => (cur === wid ? null : wid))}
+                    onClick={() => setMoreMenuFor((cur) => (cur === capabilitySetId ? null : capabilitySetId))}
                     aria-label="更多操作"
                     aria-haspopup="menu"
                     className="w-8 h-8 grid place-items-center text-text-muted border border-gray-200 rounded-lg bg-white hover:bg-surface-card hover:text-text-secondary"
                   >
                     <MoreHorizontal size={15} />
                   </button>
-                  {moreMenuFor === wid && (
+                  {moreMenuFor === capabilitySetId && (
                     <div
                       className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-xl shadow-xl border border-surface-sunken overflow-hidden z-20"
                       onMouseLeave={() => setMoreMenuFor(null)}
                     >
-                      {!sub.retained && onOpenWorkspace && (
+                      {!sub.retained && onOpenCapabilitySet && (
                         <button
                           type="button"
                           className="w-full text-left px-3 py-2 text-sm text-text-secondary hover:bg-surface-card inline-flex items-center gap-2"
                           onClick={() => {
                             setMoreMenuFor(null);
-                            onOpenWorkspace(wid);
+                            onOpenCapabilitySet(capabilitySetId);
                           }}
                         >
                           <Eye size={14} />
-                          查看空间详情
+                          查看能力集详情
                         </button>
                       )}
                       {!sub.retained && (
@@ -202,11 +202,11 @@ export default function SubscriptionStrip({
                           className="w-full text-left px-3 py-2 text-sm text-text-secondary hover:bg-surface-card inline-flex items-center gap-2"
                           onClick={() => {
                             setMoreMenuFor(null);
-                            navigate(`/workspaces/${wid}/edit`);
+                            navigate(`/capability-sets/${capabilitySetId}/edit`);
                           }}
                         >
                           <Pencil size={14} />
-                          编辑工作空间
+                          编辑能力集
                         </button>
                       )}
                       <button
@@ -245,18 +245,18 @@ export default function SubscriptionStrip({
             <div className="flex items-center gap-2 mb-1">
               <h3 className="text-sm font-semibold text-text-primary">单独添加的能力</h3>
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-surface-sunken text-text-muted">
-                非空间
+                单项
               </span>
             </div>
             <p className="text-xs text-text-muted line-clamp-1">
-              通过「添加能力」逐条安装的能力，不属于任何空间。
+              通过「添加能力」逐条安装，不属于任何能力集。
             </p>
             <SyncPolicyToggle
               value={implicitSub?.syncPolicy ?? "auto"}
               onChange={(p) =>
                 handleSetSyncPolicy(
                   implicitSub ?? {
-                    workspaceId: null,
+                    capabilitySetId: null,
                     syncPolicy: "auto",
                     targetTools: null,
                     installedAt: "",
@@ -267,7 +267,7 @@ export default function SubscriptionStrip({
             />
             <ManageTargetsRow
               projectId={project.id}
-              workspaceTargets={[...TARGET_TOOLS]}
+              capabilitySetTargets={[...TARGET_TOOLS]}
               activeTargets={project.defaultTargets}
               disabled={legacyLock}
               onChanged={onChanged}
@@ -282,12 +282,12 @@ export default function SubscriptionStrip({
             className="w-full min-h-[84px] h-full rounded-2xl border border-dashed border-gray-300 text-text-muted hover:border-brand/50 hover:text-brand hover:bg-brand-50/60 transition-colors inline-flex items-center justify-center gap-1.5 text-sm font-medium"
           >
             <Plus size={15} />
-            添加空间
+            添加能力集
           </button>
           {addMenuOpen && (
-            <AddWorkspaceMenu
+            <AddCapabilitySetMenu
               projectId={project.id}
-              subscribedWorkspaceIds={explicitSubs.map((s) => s.workspaceId!)}
+              subscribedCapabilitySetIds={explicitSubs.map((s) => s.capabilitySetId!)}
               defaultTargets={project.defaultTargets}
               onInstalled={onChanged}
               onClose={() => setAddMenuOpen(false)}
@@ -301,10 +301,10 @@ export default function SubscriptionStrip({
       <ConfirmDialog
         open={!!uninstallSub}
         kind="danger"
-        title={`卸载订阅「${uninstallSub?.workspaceName ?? ""}」？`}
+        title={`卸载订阅「${uninstallSub?.capabilitySetName ?? ""}」？`}
         description={
           <>
-            将移除该空间订阅。被多个订阅引用的共享能力会保留，仅清除该订阅独占的能力文件
+            将移除该能力集订阅。被多个订阅引用的共享能力会保留，仅清除该订阅独占的能力文件
             与 lock 归属记录。此操作
             <span className="font-medium text-red-600">不可撤销</span>。
           </>

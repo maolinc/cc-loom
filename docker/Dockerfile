@@ -9,7 +9,7 @@
 #     -e LOOM_ADMIN_PASSWORD='a-long-unique-password' loom-server:latest
 
 # ---- Builder: 全量依赖 + 编译 ----
-FROM node:22-slim AS builder
+FROM node:25-slim AS builder
 
 # better-sqlite3 等原生模块需要编译工具链
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -39,7 +39,7 @@ RUN pnpm -r build
 RUN pnpm --filter @maolinc/cc-loom-server deploy --legacy --prod /opt/loom-server
 
 # ---- Runtime: 仅生产依赖 + 产物 ----
-FROM node:22-slim AS runtime
+FROM node:25-slim AS runtime
 
 # tini 做 PID 1,确保 SIGTERM 优雅退出; ca-certificates 供 marketplace git https clone
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tini \
